@@ -2,6 +2,17 @@
 
 Use this reference after the readiness gate passes. The job is commercial actor retouching, not generic beautification.
 
+## Operating Standard
+
+Assume the user wants material, human-visible improvements unless they explicitly ask for ultra-subtle cleanup. The edit can still be natural, but it must not be invisible.
+
+Use a non-destructive mindset borrowed from serious photo tools:
+
+- Keep the original untouched.
+- Think in targeted operations, masks, and output versions.
+- Keep a lightweight operation log, like a sidecar/profile record.
+- QA at full frame and 100% crops before accepting.
+
 ## Retouch Board
 
 Create and maintain one full-image retouch board. Include both user annotations and an independent professional scan.
@@ -15,6 +26,54 @@ Minimum scan:
 - Wardrobe/background: preserve texture, lighting, and believable detail.
 
 Do not solve only the newest complaint. Re-check the entire board after every major pass.
+
+## Retouch Operation Log
+
+Keep a concise working log. It can live in the final summary or a nearby markdown note; it does not require a formal sidecar file.
+
+Template:
+
+```text
+Mode:
+Source image:
+Output image:
+Target areas:
+- Eyes / under-eyes:
+- Eye whites / eyelids:
+- Skin marks:
+- Neck:
+- Thumb / hand:
+- Hair:
+Major operations:
+- Area | mask/selection | operation | strength | intended visible result
+Export:
+- Format, resolution, quality, master/final status
+QA:
+- Full frame:
+- 100% eyes:
+- 100% neck:
+- 100% thumb/hand:
+- Authenticity:
+- Minimum viable edit threshold:
+Decision:
+- Accepted / strengthen / switch to light regen / proof only
+```
+
+Use this log to avoid losing the whole retouch board after one round of feedback.
+
+## Minimum Viable Edit Threshold
+
+The edit passes only when a normal human viewer can see meaningful improvement without being told exactly where to look.
+
+Reject a pass when:
+
+- The only difference is measurable in pixels but not visually meaningful.
+- Annotated problem areas still look essentially the same.
+- Under-eye discoloration, scaling, or fine lines remain the first thing a client notices.
+- Neck or thumb/hand discoloration was flagged but barely changed.
+- The result looks natural but not improved enough to justify a new version.
+
+If a conservative local pass cannot meet this threshold, switch to light regen or clearly label the result as insufficient.
 
 ## Light Retouching Mode
 
@@ -37,10 +96,12 @@ Before finishing, compare before/after crops for both eyes, neck, thumb/hand, an
 Operational notes:
 
 - Preserve full source resolution.
-- Use local masks for small corrections, not global smoothing.
+- Use local masks or precise selections for small corrections, not global smoothing.
+- Treat every correction as a layer-style operation: area, mask/selection, operation, strength, expected visible result.
 - Keep pore texture, stubble, moles, and natural asymmetry.
 - Use high-quality export settings and never overwrite the original.
 - Reject the pass if the result is technically changed but not visibly improved.
+- If material improvement requires stronger rescue work, stop pretending and choose light regen.
 
 ## Light Regen Mode
 
@@ -74,7 +135,9 @@ Imagegen-specific safeguards:
 - Use annotated images only as maps, never as output sources.
 - Lock identity, eye shape, facial structure, hands, wardrobe, background, lighting, and crop.
 - Do not accept an output that looks generated, airbrushed into wax, or subtly like a different person.
+- Reject or label as proof if brows, lashes, skin pores, sweater texture, hands, or background show AI artifacts.
 - If the output is lower resolution or loses real texture, call it a light-regen proof/final candidate, not a maximum-quality final, unless the user explicitly accepts that tradeoff.
+- Require the same minimum viable edit threshold as local retouching: eyes, under-eyes, neck, and thumb/hand must be visibly improved when they are part of the retouch board.
 
 ## Output Checklist
 
@@ -88,6 +151,7 @@ Before presenting output, inspect:
 - Face identity: no drift in expression, jaw, brows, lashes, eyelids, smile, or facial proportions.
 - Wardrobe and hands: no AI artifacts or changed shape/texture.
 - Export quality: maximum practical quality, original preserved, versioned output saved.
+- Minimum viable edit threshold: the improvement is visible to a human eye without forensic comparison.
 
 Reject and iterate when:
 
@@ -96,3 +160,4 @@ Reject and iterate when:
 - Mask edges, color halos, or patch artifacts appear.
 - Imagegen changed identity, clothing, hand shape, or realism.
 - A low-resolution or detail-losing output is being mislabeled as final.
+- The latest feedback item is addressed while older board items are forgotten.
