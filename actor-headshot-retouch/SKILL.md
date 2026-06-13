@@ -1,6 +1,6 @@
 ---
 name: actor-headshot-retouch
-description: Readiness-gated expert workflow for actor, model, casting, agency, and commercial headshot retouching. Use when Codex is asked to polish, airbrush, rescue, or light-regenerate portraits or headshots while preserving identity, including tired eyes, under-eye texture, eye whites, skin discoloration, neck/hand issues, flyaways, and maximum-quality final outputs that must not look AI-generated.
+description: Readiness-gated expert workflow for actor, model, casting, agency, and commercial headshot retouching. Use when Codex is asked to polish, airbrush, rescue, or light-regenerate portraits or headshots while preserving identity and making material human-visible improvements, including tired eyes, under-eye texture, eye whites, skin discoloration, neck/hand issues, flyaways, and maximum-quality final outputs that must not look AI-generated.
 ---
 
 # Actor Headshot Retouch
@@ -46,6 +46,19 @@ Choose one mode after readiness passes.
 
 If the source has obvious under-eye scaling, crepey texture, brown/purple/yellow discoloration, or dull eye whites, do not pretend a weak deterministic pass is enough. Choose light regen or explain the quality tradeoff.
 
+## Minimum Viable Edit Threshold
+
+Assume the user wants material edits by default. Do not produce or present retouches that are impossible for a human eye to see.
+
+Before final output, compare before/after at:
+
+- Full frame
+- 100% crops of both eyes and under-eyes
+- 100% crops of neck discoloration when visible
+- 100% crops of thumb/hand discoloration when visible
+
+Reject, strengthen, or switch modes when changes are only technically measurable but not visibly meaningful. If an edit is intentionally subtle, say so explicitly and explain why subtlety is the right creative choice.
+
 ## Retouch Board Rule
 
 Maintain one full-image retouch board for every run. Include user annotations plus your own scan.
@@ -65,6 +78,22 @@ Minimum board:
 - Wardrobe texture and background integrity
 
 For the detailed workflow, read `references/retouch_workflows.md` before retouching.
+
+## Pipeline Discipline
+
+Work in explicit stages inspired by professional non-destructive photo tools:
+
+1. Inspect the source and annotations.
+2. Build the retouch board.
+3. Choose light retouching or light regen.
+4. Apply targeted operations only.
+5. Export at maximum practical quality.
+6. QA full frame and 100% crops.
+7. Accept, strengthen, switch modes, or label as proof.
+
+For local retouching, treat each correction like a layer/mask operation: area, mask or selection, operation, strength, and expected visible result. Avoid global smoothing unless the entire image genuinely needs it.
+
+Keep a concise retouch operation log in the working notes or final summary: target areas, mode, major operations, output quality, and QA pass/fail. This is a lightweight sidecar/profile habit, not a new required file format.
 
 ## Quality Safeguards
 
@@ -94,6 +123,7 @@ Reject or iterate if:
 - Fabric, hair, hands, or skin contain AI artifacts.
 - Retouching calls attention to itself.
 - Before/after crops show no meaningful improvement in annotated problem areas.
+- The result is technically changed but visually invisible.
 
 ## Cross-Platform Setup Guidance
 
