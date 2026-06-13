@@ -1,0 +1,4 @@
+interface:
+  display_name: "Actor Headshot Retouch"
+  short_description: "Readiness-gated actor headshot retouching"
+  default_prompt: "Use $actor-headshot-retouch to readiness-check and retouch this actor headshot without losing authenticity."
