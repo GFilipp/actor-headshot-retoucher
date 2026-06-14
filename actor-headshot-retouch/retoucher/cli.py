@@ -62,7 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["hybrid-map", "light-retouch", "light-regen"], help="Retouch mode.",
     )
     p.add_argument("--backend", default="openai", choices=["openai", "mock"], help="Generator backend.")
-    p.add_argument("--model", default="gpt-image-1", help="Model id for the OpenAI backend.")
+    p.add_argument("--model", default=None,
+                   help="OpenAI model id. Default: $OPENAI_IMAGE_MODEL or gpt-image-2 (current latest).")
     p.add_argument("--dry-run", action="store_true", help="Use the mock generator (no API, no cost).")
     p.add_argument("--strength", type=float, default=None, help="Transfer strength 0..1.")
     p.add_argument("--max-mp", type=float, default=None, help="Max megapixels sent to the generator.")

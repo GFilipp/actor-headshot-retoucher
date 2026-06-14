@@ -1,6 +1,8 @@
 """Generator backend tests that need no API key."""
 from __future__ import annotations
 
+import os
+
 import numpy as np
 
 from retoucher.generate import MockGenerator, OpenAIGenerator, closest_gpt_image_size, get_generator
@@ -15,8 +17,18 @@ def test_closest_size_matches_aspect():
 
 def test_factory_returns_backends():
     assert isinstance(get_generator("mock"), MockGenerator)
-    g = get_generator("openai", model="gpt-image-1")          # constructs without importing openai
-    assert isinstance(g, OpenAIGenerator) and g.model == "gpt-image-1" and g.quality == "high"
+    g = get_generator("openai")                                # constructs without importing openai
+    assert isinstance(g, OpenAIGenerator)
+    assert g.model == os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-2")
+    assert g.quality == "high"
+
+
+def test_model_resolution_and_override(monkeypatch):
+    monkeypatch.delenv("OPENAI_IMAGE_MODEL", raising=False)
+    assert OpenAIGenerator().model == "gpt-image-2"                     # current latest default
+    assert OpenAIGenerator(model="gpt-image-9").model == "gpt-image-9"  # explicit wins
+    monkeypatch.setenv("OPENAI_IMAGE_MODEL", "gpt-image-3")
+    assert OpenAIGenerator().model == "gpt-image-3"                     # env override, no code change
 
 
 def test_mock_generator_runs_offline():

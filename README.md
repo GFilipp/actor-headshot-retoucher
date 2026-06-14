@@ -100,7 +100,13 @@ print(res.qa.verdict, res.report["qa"])
 
 ## The model is swappable
 
-OpenAI (`gpt-image-1`) is the default for accessibility. It is the weakest part of the chain for this workflow because it tends to regenerate and recolor, and it may be deprecated (verify current status before relying on it). The pipeline does not trust its pixels globally, so the model matters less than it would in a regenerate-everything tool. To swap in FLUX.1 Kontext, Gemini, or a local model, implement the one-method `Generator` interface in [`retoucher/generate.py`](actor-headshot-retouch/retoucher/generate.py); nothing else changes.
+OpenAI `gpt-image-2` (the current latest) is the default. It resolves from the `OPENAI_IMAGE_MODEL` environment variable, then `--model`, so when OpenAI ships the next model you point at it with no code change:
+
+```bash
+export OPENAI_IMAGE_MODEL=gpt-image-3   # or pass --model gpt-image-3
+```
+
+The generator is still the weakest part of the chain for this workflow (it tends to regenerate and recolor), but the pipeline never trusts its pixels globally, so the model matters less than in a regenerate-everything tool. To swap in FLUX.1 Kontext, Gemini, or a local model, implement the one-method `Generator` interface in [`retoucher/generate.py`](actor-headshot-retouch/retoucher/generate.py); nothing else changes.
 
 ## Limitations
 

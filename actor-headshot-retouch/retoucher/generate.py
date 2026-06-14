@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import io
+import os
 from typing import Callable, Protocol
 
 import numpy as np
@@ -58,30 +59,40 @@ class MockGenerator:
         return self._transform(image_rgb).astype(np.float32)
 
 
-# gpt-image-1 only emits these three sizes. Requesting the bucket closest to the
-# input aspect keeps the returned target close in framing, so alignment stays
-# clean (a wrong aspect would force an anisotropic resize before diffing).
-GPT_IMAGE_SIZES = {"1024x1024": 1.0, "1536x1024": 1536 / 1024, "1024x1536": 1024 / 1536}
+# Resolution order: explicit arg -> $OPENAI_IMAGE_MODEL -> current latest.
+# Never hard-pin a model that will be deprecated; the env var lets you point at
+# the next model with no code change.
+DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2"  # current latest as of 2026-06
+
+# The three fixed sizes the legacy gpt-image-1 supports. gpt-image-2 takes
+# flexible sizes and "auto", so this is only used when you pin gpt-image-1 and
+# pass size="bucket".
+GPT_IMAGE_1_SIZES = {"1024x1024": 1.0, "1536x1024": 1536 / 1024, "1024x1536": 1024 / 1536}
 
 
 def closest_gpt_image_size(width: int, height: int) -> str:
+    """Closest legacy gpt-image-1 size bucket to the input aspect ratio."""
     aspect = width / max(1, height)
-    return min(GPT_IMAGE_SIZES, key=lambda s: abs(GPT_IMAGE_SIZES[s] - aspect))
+    return min(GPT_IMAGE_1_SIZES, key=lambda s: abs(GPT_IMAGE_1_SIZES[s] - aspect))
+
+
+def resolve_openai_model(model: str | None = None) -> str:
+    return model or os.environ.get("OPENAI_IMAGE_MODEL") or DEFAULT_OPENAI_IMAGE_MODEL
 
 
 class OpenAIGenerator:
-    """OpenAI image-edit backend (gpt-image-1 by default).
+    """OpenAI image-edit backend.
 
-    Kept deliberately thin. Per the plan this is the current choice for
-    accessibility; the noisy-diff and deprecation risk are mitigated by (a) the
-    pipeline never trusting these pixels globally and (b) this seam making a
-    later model swap a small change.
+    Defaults to the current latest model and resolves from $OPENAI_IMAGE_MODEL,
+    so shipping the next model needs no code change. The pipeline never trusts
+    these pixels globally, and this one-method seam makes swapping to FLUX.1
+    Kontext / Gemini / a local model trivial.
     """
 
-    def __init__(self, model: str = "gpt-image-1", quality: str = "high", size: str = "auto"):
-        self.model = model
+    def __init__(self, model: str | None = None, quality: str = "high", size: str = "auto"):
+        self.model = resolve_openai_model(model)
         self.quality = quality  # "high" gives a more faithful target (costs more)
-        self.size = size  # "auto" -> closest aspect bucket; or pass an explicit size
+        self.size = size  # "auto" (default), explicit "WxH", or "bucket" (legacy gpt-image-1)
 
     def edit(self, image_rgb: np.ndarray, prompt: str) -> np.ndarray:
         try:
@@ -94,7 +105,8 @@ class OpenAIGenerator:
             ) from exc
 
         h, w = image_rgb.shape[:2]
-        size = closest_gpt_image_size(w, h) if self.size == "auto" else self.size
+        # gpt-image-2 handles "auto"; "bucket" maps to a legacy gpt-image-1 size.
+        size = closest_gpt_image_size(w, h) if self.size == "bucket" else self.size
 
         buf = io.BytesIO()
         Image.fromarray(to_uint8(image_rgb)).save(buf, format="PNG")
