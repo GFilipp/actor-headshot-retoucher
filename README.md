@@ -34,11 +34,7 @@ original ──▶ generate target ──▶ align to original ──▶ frequen
 
 Each stage is a small, testable module in [`retoucher/`](actor-headshot-retouch/retoucher).
 
-Every run also writes a before/after contact sheet so you can judge the result at 100%:
-
-![QA contact sheet](actor-headshot-retouch/examples/synthetic_retouch_v1_qa.png)
-
-*Automated QA output on synthetic data (reproduce with `python actor-headshot-retouch/examples/make_example.py`): marks healed, under-eye tone corrected, pore texture and identity intact.*
+Every run also writes a before/after contact sheet (full frame plus 100% crops) and a JSON report, so you can judge the result without pixel-peeping.
 
 ## Quality gates
 
