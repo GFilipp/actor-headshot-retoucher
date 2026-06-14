@@ -60,14 +60,19 @@ class QAThresholds:
 class PipelineConfig:
     # hybrid-map | light-retouch | light-regen
     mode: str = "hybrid-map"
-    # Frequency separation: Gaussian sigma (px) that splits low-freq tone from
-    # high-freq texture. Larger = coarser tone layer.
+    # Spatial params below (freq_sigma, feather_px) are expressed at this
+    # reference width; the pipeline scales them to the image's actual size so
+    # behaviour is the same on a 512px and a 4096px file. Never assume a fixed
+    # resolution.
+    reference_dim: int = 1024
+    # Frequency separation: Gaussian sigma (px at reference_dim) that splits
+    # low-freq tone from high-freq texture. Larger = coarser tone layer.
     freq_sigma: float = 8.0
     # Per-region transfer strength in [0, 1]. 1.0 takes the full mapped delta.
     strength: float = 0.85
     # Remove a uniform colour cast the model may add, so complexion never drifts.
     neutralize_global_cast: bool = True
-    # Feather (px) applied to every mask edge to avoid seams / halos.
+    # Feather (px at reference_dim) applied to every mask edge to avoid seams.
     feather_px: float = 12.0
     # Max megapixels sent to the generator; the original is restored afterwards.
     generator_max_mp: float = 1.5

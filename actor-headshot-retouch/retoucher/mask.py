@@ -119,9 +119,9 @@ def build_masks(
 
     by_kind = {
         "tone": _feather(tone, cfg.feather_px),
-        # Marks are small; a tight feather keeps the core at full strength so the
-        # heal actually lands, while still softening the rim.
-        "heal": _feather(heal, 2.0),
+        # Marks are small; a tight feather (derived from feather_px so it scales
+        # with resolution) keeps the core at full strength so the heal lands.
+        "heal": _feather(heal, max(1.0, cfg.feather_px / 6.0)),
     }
     return RegionMasks(by_kind=by_kind, skin=skin, by_region=by_region)
 

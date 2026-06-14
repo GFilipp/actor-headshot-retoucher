@@ -8,7 +8,7 @@ original's own texture.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -48,6 +48,13 @@ def retouch_image(
     loaded = image_io.load(source_path)
     original = loaded.pixels
 
+    # Scale pixel-based params to the image's actual size so behaviour is
+    # resolution-independent (an 8px blur on a 4096px file would be useless).
+    spatial = max(original.shape[:2]) / float(cfg.reference_dim)
+    cfg = replace(
+        cfg, freq_sigma=cfg.freq_sigma * spatial, feather_px=cfg.feather_px * spatial
+    )
+
     # 1) Propose a retouch target (downscaled to keep generation affordable).
     gen_input, scale = image_io.resize_to_megapixels(original, cfg.generator_max_mp)
     target = generator.edit(gen_input, prompts.prompt_for(cfg.mode))
@@ -72,6 +79,7 @@ def retouch_image(
     report = {
         "source": str(source_path),
         "mode": cfg.mode,
+        "spatial_scale": round(spatial, 4),
         "generator_scale": round(scale, 4),
         "alignment": {"method": align.method, "score": round(align.score, 4), "success": align.success},
         "edited_fraction": round(float((masks.edited() > 0.05).mean()), 4),

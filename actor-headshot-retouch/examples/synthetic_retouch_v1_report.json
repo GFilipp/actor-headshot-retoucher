@@ -1,13 +1,14 @@
 {
   "source": "/Users/garyfilipp/Documents/Claude/actor-headshot-retouch-skill/actor-headshot-retouch/examples/synthetic.png",
   "mode": "hybrid-map",
+  "spatial_scale": 0.25,
   "generator_scale": 1.0,
   "alignment": {
     "method": "ecc-affine",
     "score": 0.9893,
     "success": true
   },
-  "edited_fraction": 0.2379,
+  "edited_fraction": 0.101,
   "qa": {
     "verdict": "pass",
     "gates": [
@@ -35,14 +36,14 @@
       {
         "name": "edited_delta_e",
         "status": "pass",
-        "value": 4.802,
+        "value": 3.787,
         "threshold": 1.5,
         "detail": "edit visible and within range"
       },
       {
         "name": "texture",
         "status": "pass",
-        "value": 0.0416,
+        "value": 0.053,
         "threshold": 0.45,
         "detail": "high-frequency energy loss"
       }
@@ -50,10 +51,11 @@
   },
   "config": {
     "mode": "hybrid-map",
-    "freq_sigma": 8.0,
+    "reference_dim": 1024,
+    "freq_sigma": 2.0,
     "strength": 0.85,
     "neutralize_global_cast": true,
-    "feather_px": 12.0,
+    "feather_px": 3.0,
     "generator_max_mp": 1.5,
     "ecc_iterations": 200,
     "ecc_epsilon": 1e-05,

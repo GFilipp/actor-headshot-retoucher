@@ -59,10 +59,10 @@ class MockGenerator:
         return self._transform(image_rgb).astype(np.float32)
 
 
-# Resolution order: explicit arg -> $OPENAI_IMAGE_MODEL -> current latest.
-# Never hard-pin a model that will be deprecated; the env var lets you point at
-# the next model with no code change.
-DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2"  # current latest as of 2026-06
+# Last-resort only, used if the live models API can't be reached. The OPERATIVE
+# default is auto-discovered at runtime (see discover_latest_image_model), so a
+# new release like gpt-image-3 is picked up with zero code change.
+FALLBACK_OPENAI_IMAGE_MODEL = "gpt-image-2"
 
 # The three fixed sizes the legacy gpt-image-1 supports. gpt-image-2 takes
 # flexible sizes and "auto", so this is only used when you pin gpt-image-1 and
@@ -76,23 +76,59 @@ def closest_gpt_image_size(width: int, height: int) -> str:
     return min(GPT_IMAGE_1_SIZES, key=lambda s: abs(GPT_IMAGE_1_SIZES[s] - aspect))
 
 
-def resolve_openai_model(model: str | None = None) -> str:
-    return model or os.environ.get("OPENAI_IMAGE_MODEL") or DEFAULT_OPENAI_IMAGE_MODEL
+def discover_latest_image_model(client) -> str:
+    """Newest non-mini ``gpt-image*`` model the account can see.
+
+    Picks by the model's ``created`` timestamp, so new releases are adopted
+    automatically with no code change. Mini variants are excluded as the
+    cheaper, lower-fidelity tier.
+    """
+    models = list(client.models.list().data)
+    candidates = [
+        m for m in models
+        if str(getattr(m, "id", "")).startswith("gpt-image") and "mini" not in str(m.id)
+    ]
+    if not candidates:
+        raise RuntimeError("no gpt-image models available to this account")
+    return max(candidates, key=lambda m: getattr(m, "created", 0) or 0).id
+
+
+def pinned_openai_model(model: str | None = None) -> str | None:
+    """A model the user pinned via arg or $OPENAI_IMAGE_MODEL, else None (auto-discover)."""
+    return model or os.environ.get("OPENAI_IMAGE_MODEL") or None
 
 
 class OpenAIGenerator:
     """OpenAI image-edit backend.
 
-    Defaults to the current latest model and resolves from $OPENAI_IMAGE_MODEL,
-    so shipping the next model needs no code change. The pipeline never trusts
-    these pixels globally, and this one-method seam makes swapping to FLUX.1
-    Kontext / Gemini / a local model trivial.
+    By default it auto-discovers OpenAI's latest gpt-image model at call time, so
+    a new release needs no code change. Pin a specific model with the ``model``
+    arg or ``$OPENAI_IMAGE_MODEL``. The pipeline never trusts these pixels
+    globally, and this one-method seam makes swapping to FLUX.1 Kontext / Gemini
+    / a local model trivial.
     """
 
     def __init__(self, model: str | None = None, quality: str = "high", size: str = "auto"):
-        self.model = resolve_openai_model(model)
+        self.pinned_model = pinned_openai_model(model)  # None => auto-discover latest
         self.quality = quality  # "high" gives a more faithful target (costs more)
         self.size = size  # "auto" (default), explicit "WxH", or "bucket" (legacy gpt-image-1)
+        self._discovered: str | None = None
+
+    @property
+    def model(self) -> str | None:
+        """The model that will be used: the pinned id, or the discovered one once
+        resolved. None means discovery has not run yet (it runs at edit time)."""
+        return self.pinned_model or self._discovered
+
+    def _model_for(self, client) -> str:
+        if self.pinned_model:
+            return self.pinned_model
+        if not self._discovered:
+            try:
+                self._discovered = discover_latest_image_model(client)
+            except Exception:
+                self._discovered = FALLBACK_OPENAI_IMAGE_MODEL
+        return self._discovered
 
     def edit(self, image_rgb: np.ndarray, prompt: str) -> np.ndarray:
         try:
@@ -115,7 +151,7 @@ class OpenAIGenerator:
 
         client = OpenAI()  # reads OPENAI_API_KEY from the environment
         result = client.images.edit(
-            model=self.model, image=image_arg, prompt=prompt,
+            model=self._model_for(client), image=image_arg, prompt=prompt,
             size=size, quality=self.quality, n=1,
         )
         data = getattr(result, "data", None) or []

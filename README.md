@@ -100,13 +100,13 @@ print(res.qa.verdict, res.report["qa"])
 
 ## The model is swappable
 
-OpenAI `gpt-image-2` (the current latest) is the default. It resolves from the `OPENAI_IMAGE_MODEL` environment variable, then `--model`, so when OpenAI ships the next model you point at it with no code change:
+By default the OpenAI backend **auto-discovers the latest `gpt-image` model at runtime** (via the models API), so a new release like `gpt-image-3` is adopted with no code change. Nothing is hard-pinned. Pin a specific model if you want to:
 
 ```bash
 export OPENAI_IMAGE_MODEL=gpt-image-3   # or pass --model gpt-image-3
 ```
 
-The generator is still the weakest part of the chain for this workflow (it tends to regenerate and recolor), but the pipeline never trusts its pixels globally, so the model matters less than in a regenerate-everything tool. To swap in FLUX.1 Kontext, Gemini, or a local model, implement the one-method `Generator` interface in [`retoucher/generate.py`](actor-headshot-retouch/retoucher/generate.py); nothing else changes.
+It falls back to a known model only if the models API is unreachable. The generator is still the weakest part of the chain for this workflow (it tends to regenerate and recolor), but the pipeline never trusts its pixels globally, so the model matters less than in a regenerate-everything tool. To swap in FLUX.1 Kontext, Gemini, or a local model, implement the one-method `Generator` interface in [`retoucher/generate.py`](actor-headshot-retouch/retoucher/generate.py); nothing else changes.
 
 ## Limitations
 
