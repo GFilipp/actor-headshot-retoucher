@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install (core + dev)
+        run: pip install -e "./actor-headshot-retouch[dev]"
+      - name: Run tests (offline, mock generator)
+        run: pytest actor-headshot-retouch/tests -q
+      - name: Generate the demo artifacts (smoke)
+        run: python actor-headshot-retouch/examples/make_example.py

@@ -1,110 +1,137 @@
-# Actor Headshot Retouch Skill
+# Actor Headshot Retouch
 
-This is a Codex skill for actor, model, casting, agency, and commercial headshot retouching.
+A retouching tool for actor headshots, body shots, and marketing assets that fixes the usual barbell problem with AI retouching.
 
-It is built for three workflows:
+- Full AI regeneration looks fake and shifts identity. Casting directors punish that.
+- Minimal automated touch-ups miss the real defects or smear them.
 
-- **Light retouching:** for photos that are already strong and only need minor local polish.
-- **Hybrid map:** the default path. Use image generation to create a retouch map/proof, then transfer accepted fixes back onto the original full-resolution structure.
-- **Light regen:** for photos that need max-quality imagegen rescue work around tired eyes, under-eyes, discoloration, eye whites, neck, hands, or skin fatigue.
+This tool takes a third path. A generative model proposes a retouched **target** (what good looks like). Deterministic code then transfers only the validated, local fixes back onto the original high-resolution file. The model never paints the final pixels. Texture, composition, lighting, and likeness stay the original's.
 
-The skill starts with a readiness checklist before doing any edit. It is designed to preserve identity and avoid fake, AI-looking results.
+![retouch direction map](actor-headshot-retouch/examples/retouch-map.png)
 
-By default, the skill assumes you want material, human-visible improvement. It rejects retouches that are technically changed but impossible to see.
+*Top: original. Bottom: the retouch directions the pipeline targets — lid discoloration, under-eye brownness, tear-trough shadows, crepey texture, and eye whites. Each is corrected as a subtle, masked, texture-preserving edit, never a regeneration.*
 
-## What To Install
+## Why it stays real
 
-Copy the entire folder named:
+The generated target is treated as **direction, not pixels**.
 
-```text
-actor-headshot-retouch
+- Tone and colour fixes (under-eye discoloration, eyelids, neck, hands) transfer as a low-frequency delta. The original's high-frequency texture is re-added on top, so pores and stubble are untouched.
+- Marks and blemishes are healed from the original's own surrounding texture, never from the generated image. Generated skin is lower resolution and fabricated; importing it is what makes AI retouches look plastic.
+- Any uniform colour cast the model adds is removed before transfer, so complexion never drifts.
+- Edits are confined to masked regions, so nothing leaks into cheeks, eye whites, or background.
+
+## How it works
+
+```
+original ──▶ generate target ──▶ align to original ──▶ frequency-separated
+                (OpenAI)            (ECC / ORB)          touch-up map
+                                                              │
+   versioned output ◀── QA gates ◀── blend onto original ◀── region masks
+   + contact sheet      (identity,     (masked tone delta,    (tone vs heal)
+   + JSON report         SSIM, ΔE,      heal from original
+                         texture)       texture)
 ```
 
-into your Codex skills folder.
+Each stage is a small, testable module in [`retoucher/`](actor-headshot-retouch/retoucher).
 
-Do not copy only `SKILL.md`. The whole folder matters because it includes the readiness checker and workflow guide.
+Every run also writes a before/after contact sheet so you can judge the result at 100%:
 
-## Mac / Linux Install
+![QA contact sheet](actor-headshot-retouch/examples/synthetic_retouch_v1_qa.png)
 
-Copy and paste this into Terminal from the folder where you downloaded this repo:
+*Automated QA output on synthetic data (reproduce with `python actor-headshot-retouch/examples/make_example.py`): marks healed, under-eye tone corrected, pore texture and identity intact.*
+
+## Quality gates
+
+Every run is graded automatically. A gate whose optional backend is missing is reported as `skipped`, never silently passed. The verdict is `reject` if any gate fails; the artifact is still written for inspection.
+
+| Gate | Checks | Backend |
+| --- | --- | --- |
+| `identity` | ArcFace cosine similarity before/after (no identity drift) | InsightFace (optional) |
+| `untouched_ssim` | regions that should not change stay near-identical | core |
+| `untouched_lpips` | perceptual distance off-edit | LPIPS/torch (optional) |
+| `edited_delta_e` | the edit is visible (CIEDE2000) and not a cartoon | core |
+| `texture` | high-frequency energy not lost (no plastic skin) | core |
+
+## Install
+
+Core pipeline (everything above runs on these four):
 
 ```bash
-mkdir -p ~/.codex/skills
-cp -R actor-headshot-retouch ~/.codex/skills/
+python -m pip install ./actor-headshot-retouch
 ```
 
-Then restart Codex or open a new Codex thread.
-
-Use it by typing:
-
-```text
-Use $actor-headshot-retouch on this headshot.
-```
-
-## Windows Install
-
-Copy and paste this into PowerShell from the folder where you downloaded this repo:
-
-```powershell
-New-Item -ItemType Directory -Force $env:USERPROFILE\.codex\skills
-Copy-Item -Recurse actor-headshot-retouch $env:USERPROFILE\.codex\skills\
-```
-
-Then restart Codex or open a new Codex thread.
-
-Use it by typing:
-
-```text
-Use $actor-headshot-retouch on this headshot.
-```
-
-## Optional Photo Tools
-
-For local and hybrid-map retouching, install:
-
-- Python 3.12
-- ImageMagick
-- libvips
-- ExifTool
-
-Then install the Python image packages:
+Optional stronger masks and gates (face-landmark regions, identity check, perceptual check, RAW input):
 
 ```bash
-python -m venv photo-retouch
-python -m pip install --upgrade pip wheel setuptools
-python -m pip install numpy pillow opencv-python scikit-image mediapipe rawpy pyvips
+python -m pip install "./actor-headshot-retouch[advanced]"
 ```
 
-You do **not** need PyYAML to use this skill.
+For real runs against OpenAI, add the SDK and set a key:
 
-## What The Skill Checks
+```bash
+python -m pip install "./actor-headshot-retouch[openai]"
+export OPENAI_API_KEY=sk-...
+```
 
-Before editing, the skill checks:
+## Use
 
-- Python imaging stack
-- ImageMagick
-- libvips
-- ExifTool
-- whether image generation is available for hybrid-map and light regen
-- whether the source image can be read
-- whether the output folder can be written
+```bash
+# Offline smoke (mock generator, no API key, no cost):
+retoucher headshot.jpg --dry-run --out-dir out
 
-If something required is missing, the skill stops before editing.
+# Real run against OpenAI:
+retoucher headshot.jpg --mode hybrid-map --out-dir out
 
-## What Changed In v1.2.0
+# Batch a whole shoot:
+retoucher ./shoot --out-dir ./shoot-retouched
+```
 
-- Added `hybrid-map` as the explicit default workflow.
-- Added readiness support for `--mode hybrid-map`.
-- Made image generation a retouch-map/proof step before transferring accepted fixes back to the original full-resolution structure.
-- Added clearer escalation rules for max-quality light regen when local or hybrid fixes cannot visibly solve hard eye, skin, thumb, or neck issues.
-- Added specific guardrails against cheek bleaching, broad blur, face-shape drift, annotation marks, old reference artifacts, and invisible edits.
+Each run writes a versioned image (the original is never overwritten), a before/after contact sheet, and a JSON report with the alignment method and every QA gate.
 
-## What Changed In v1.1.0
+Python API:
 
-- Added a minimum viable edit threshold so invisible retouches are rejected.
-- Added before/after QA expectations for full frame and 100% crops.
-- Added a lightweight retouch operation log inspired by non-destructive photo workflows.
-- Strengthened local retouching rules around targeted masks/selections.
-- Strengthened light regen rules so low-detail or AI-looking outputs are proof candidates, not automatic finals.
+```python
+from retoucher import OpenAIGenerator, PipelineConfig
+from retoucher.pipeline import retouch_image
 
-The skill borrows workflow ideas from tools like PhotoFlow, darktable, RawTherapee, and GEGL, but it does **not** require installing them.
+res = retouch_image("headshot.jpg", "out", OpenAIGenerator(), PipelineConfig(mode="hybrid-map"))
+print(res.qa.verdict, res.report["qa"])
+```
+
+## The model is swappable
+
+OpenAI (`gpt-image-1`) is the default for accessibility. It is the weakest part of the chain for this workflow because it tends to regenerate and recolor, and it may be deprecated (verify current status before relying on it). The pipeline does not trust its pixels globally, so the model matters less than it would in a regenerate-everything tool. To swap in FLUX.1 Kontext, Gemini, or a local model, implement the one-method `Generator` interface in [`retoucher/generate.py`](actor-headshot-retouch/retoucher/generate.py); nothing else changes.
+
+## Limitations
+
+- Alignment can fail when the generated target differs a lot in pose or expression. The pipeline falls back (ECC, then ORB), flags low confidence, and the identity gate catches drift.
+- The generator must keep the same crop and framing for a clean transfer. The prompts ask for this; a model that recrops will produce weaker results.
+- Face-region masks are most precise with the optional MediaPipe backend; without it the tool edits where the target proposed a change, refined by a skin estimate.
+- The demo image is synthetic. Real before/after quality depends on the source photo and the generator.
+- Privacy: a real run uploads your image to the generator's API (OpenAI by default); review their data policy first. Offline `--dry-run` and the test suite never leave your machine.
+
+## Repository layout
+
+This is both a runnable Python package and a Codex/agent skill.
+
+```
+actor-headshot-retouch/
+├── retoucher/          the pipeline (align, diff, mask, blend, qa, cli)
+├── scripts/            check_readiness.py preflight
+├── tests/              offline test suite (mock generator)
+├── examples/           reproducible before/after demo
+├── SKILL.md            agent behaviour spec
+├── references/         retouch standards and prompts
+└── pyproject.toml
+```
+
+To use it as a Codex skill, copy the `actor-headshot-retouch` folder into your skills directory and invoke it; the skill runs the same pipeline described here.
+
+## Develop
+
+```bash
+python -m pip install -e "./actor-headshot-retouch[dev]"
+pytest actor-headshot-retouch/tests -q
+```
+
+Tests run fully offline with a mock generator, so no API key or network is needed. They bootstrap the package onto the path, so `pytest` and `python examples/make_example.py` work straight from a clone even without installing. (Editable installs have a known import-resolution quirk on the Python 3.14 preview; use a regular `pip install` there. Supported and CI-tested on 3.10 to 3.12.)

@@ -42,8 +42,8 @@ The skill must not assume macOS, Windows, Linux, Homebrew, Chocolatey, winget, a
 Choose one mode after readiness passes. Default to **Hybrid map** unless the source clearly fits a lighter or heavier path.
 
 - **Light retouching (`light-retouch`):** Use only for near-perfect photos needing minor local polish, full-resolution preservation, metadata-aware export, and conservative fixes. Choose this when imagegen would be overkill and the defects are small enough to fix visibly with masks/heal/clone/color work.
-- **Hybrid map (`hybrid-map`):** Use as the normal default. Use image generation to create a retouch map or proof, judge which fixes are worth accepting, then apply those fixes back onto the original full-resolution structure with targeted masks and local operations. Preserve the source crop, face/body shape, eye shape, hands, wardrobe, lighting, and real texture.
-- **Light regen (`light-regen`):** Use when the map shows changes that are too significant or fragile to transfer cleanly, or when local/hybrid attempts cannot visibly fix tired eyes, under-eye texture, red/brown lid discoloration, dull eye whites, neck/thumb/hand color, or skin fatigue. Use built-in image editing/generation when available; if not available, stop unless the user has explicitly approved an API/CLI fallback.
+- **Hybrid map (`hybrid-map`):** The normal default. Image generation creates a retouch target; the deterministic pipeline (`retoucher`) then aligns it to the original, builds a frequency-separated touch-up map, masks it to the intended regions, and transfers only the local fixes back onto the original full-resolution file. The model proposes direction; code does the transfer. Do not hand-apply the map freehand. Run the pipeline (see Deterministic Transfer below) rather than editing pixels by instruction.
+- **Light regen (`light-regen`):** Rare fallback only. Use when the deterministic transfer genuinely cannot solve a defect (for example severe under-eye texture that no local fix reaches). A fully regenerated image is what casting directors punish, so never make this the default and always label it as a regen candidate with the quality tradeoff named.
 
 If the source has obvious under-eye scaling, crepey texture, brown/purple/yellow discoloration, dull eye whites, thumb discoloration, or repeated failed local fixes, do not pretend a weak deterministic pass is enough. Start with hybrid-map or escalate to light-regen and explain the quality tradeoff.
 
@@ -90,15 +90,27 @@ Work in explicit stages inspired by professional non-destructive photo tools:
 1. Inspect the source and annotations.
 2. Build the retouch board.
 3. Choose light-retouch, hybrid-map, or light-regen.
-4. For hybrid-map, generate or use an imagegen proof as a retouch map, then transfer only accepted fixes back to the original structure.
-5. Apply targeted operations only.
-6. Export at maximum practical quality.
-7. QA full frame and 100% crops.
-8. Accept, strengthen, switch modes, or label as proof.
+4. For hybrid-map, run the deterministic pipeline: it generates the target, aligns it, masks it, and transfers only the local fixes back. Do not hand-apply the map.
+5. Let the pipeline apply targeted, masked operations only.
+6. Export at maximum practical quality (the pipeline writes a versioned file and never overwrites the original).
+7. Review the QA gates and the generated before/after contact sheet.
+8. Accept, strengthen (raise `--strength`), switch modes, or label as a regen candidate.
+
+### Deterministic Transfer
+
+Run hybrid-map through the package rather than editing pixels by instruction:
+
+```bash
+retoucher /path/to/source.jpg --mode hybrid-map --out-dir /path/to/outputs
+# offline smoke with no API key:
+retoucher /path/to/source.jpg --dry-run --out-dir /path/to/outputs
+```
+
+The pipeline aligns the generated target to the original (ECC, ORB fallback), separates tone from texture, masks the intended regions, transfers the masked low-frequency delta while keeping the original's texture, heals marks from surrounding original pixels, and writes a JSON report plus a contact sheet. The model output is direction only; it is never the final pixels.
 
 For local retouching, treat each correction like a layer/mask operation: area, mask or selection, operation, strength, and expected visible result. Avoid global smoothing unless the entire image genuinely needs it.
 
-Keep a concise retouch operation log in the working notes or final summary: target areas, mode, major operations, output quality, and QA pass/fail. This is a lightweight sidecar/profile habit, not a new required file format.
+The JSON report written next to each output is the retouch operation log: mode, alignment, edited fraction, and every QA gate. No separate sidecar is required.
 
 ## Quality Safeguards
 

@@ -31,16 +31,26 @@ class Check:
         return self.status == "pass"
 
 
-PYTHON_IMPORTS = [
+# The deterministic pipeline runs on these four. They are the only required
+# Python dependencies.
+CORE_IMPORTS = [
     ("numpy", "numpy"),
     ("Pillow", "PIL"),
     ("OpenCV", "cv2"),
     ("scikit-image", "skimage"),
+]
+
+# Optional: stronger masks / quality gates / inputs. Missing ones are reported,
+# never blocking; the pipeline degrades gracefully.
+OPTIONAL_IMPORTS = [
     ("MediaPipe", "mediapipe"),
+    ("InsightFace", "insightface"),
+    ("LPIPS", "lpips"),
     ("rawpy", "rawpy"),
     ("pyvips", "pyvips"),
 ]
 
+# Optional CLI tools (nice for 16-bit masters / metadata). Never blocking.
 CLI_TOOLS = [
     ("ImageMagick", "magick"),
     ("libvips", "vips"),
@@ -70,6 +80,7 @@ def is_writable_dir(path: Path) -> tuple[bool, str]:
 def check_python_stack(required: bool) -> Check:
     missing: list[str] = []
     versions: list[str] = []
+    optional_notes: list[str] = []
 
     version = sys.version_info
     if version < (3, 10):
@@ -77,10 +88,7 @@ def check_python_stack(required: bool) -> Check:
     else:
         versions.append(f"Python {platform.python_version()}")
 
-    if (3, 10) <= version < (3, 12):
-        versions.append("Python 3.12 is ideal")
-
-    for label, module in PYTHON_IMPORTS:
+    for label, module in CORE_IMPORTS:
         try:
             imported = importlib.import_module(module)
         except Exception as exc:  # pragma: no cover - exact import failures vary
@@ -89,15 +97,17 @@ def check_python_stack(required: bool) -> Check:
         module_version = getattr(imported, "__version__", None)
         versions.append(f"{label}{' ' + module_version if module_version else ''}")
 
-    if missing:
-        return Check(
-            "Python imaging stack",
-            "fail",
-            required,
-            "missing or broken: " + "; ".join(missing),
-        )
+    for label, module in OPTIONAL_IMPORTS:
+        try:
+            importlib.import_module(module)
+            optional_notes.append(f"{label}: present")
+        except Exception:
+            optional_notes.append(f"{label}: absent (optional)")
 
-    return Check("Python imaging stack", "pass", required, "; ".join(versions))
+    detail = "; ".join(versions + optional_notes)
+    if missing:
+        return Check("Python imaging stack", "fail", required, "missing core: " + "; ".join(missing))
+    return Check("Python imaging stack", "pass", required, detail)
 
 
 def check_cli_tool(label: str, command: str, required: bool) -> Check:
@@ -137,16 +147,18 @@ def check_output_dir(path_text: str | None, required: bool) -> Check:
 
 def required_names_for_mode(mode: str) -> set[str]:
     base = {"Source image readable", "Output folder writable"}
-    local = {"Python imaging stack", "ImageMagick", "libvips", "ExifTool"}
+    stack = {"Python imaging stack"}
     regen = {"image_gen available for retouch map / light regen"}
 
+    # CLI tools (ImageMagick/libvips/ExifTool) are optional everywhere: the
+    # pipeline uses OpenCV/Pillow, not those binaries.
     if mode in {"local", "light-retouch"}:
-        return base | local
+        return base | stack
     if mode == "light-regen":
         return base | regen
     if mode == "hybrid-map":
-        return base | local | regen
-    return base | local | regen
+        return base | stack | regen
+    return base | stack | regen
 
 
 def build_checks(args: argparse.Namespace) -> list[Check]:

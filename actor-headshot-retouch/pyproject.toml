@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "actor-headshot-retoucher"
+version = "2.0.0.dev0"
+description = "Deterministic, identity-preserving headshot retouch pipeline (generate target, transfer back to original)."
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "pillow>=10.0",
+    "opencv-python-headless>=4.8",
+    "scikit-image>=0.21",
+]
+
+[project.optional-dependencies]
+# Stronger masks + quality gates. Optional because they pull in heavy deps and
+# may lag new Python releases; the pipeline degrades gracefully without them.
+advanced = [
+    "mediapipe>=0.10",       # face-landmark region masks
+    "insightface>=0.7",      # ArcFace identity gate
+    "onnxruntime>=1.16",     # insightface runtime
+    "lpips>=0.1",            # perceptual untouched-region gate
+    "rawpy>=0.19",           # RAW input
+]
+openai = ["openai>=1.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+retoucher = "retoucher.cli:main"
+
+[tool.setuptools]
+packages = ["retoucher"]

@@ -121,6 +121,8 @@ Operational notes:
 
 Use as the default workflow for most actor headshot polish work. The purpose is to let image generation reveal a strong retouch target without letting it replace the real photograph by accident.
 
+This mode is implemented by the deterministic `retoucher` pipeline. Generation proposes the target; code performs the alignment, masking, transfer, and QA. The steps below describe what the pipeline does; do not hand-apply them. Run `retoucher <source> --mode hybrid-map --out-dir <dir>`.
+
 Workflow:
 
 1. Use the clean original as the source of truth for identity, geometry, crop, wardrobe, hands, hair, lighting, and final resolution.
@@ -130,7 +132,7 @@ Workflow:
 5. Preserve original structure and believable detail. The final hybrid should look like the original photo professionally retouched, not a newly generated portrait.
 6. QA the transferred result against the original and the imagegen map. Strengthen, switch to light regen, or label as proof if the mapped fixes cannot be reproduced cleanly.
 
-Hybrid-map prompt:
+Hybrid-map prompt (versioned in `retoucher/prompts.py`, which the pipeline imports; edit it there):
 
 ```text
 Create a high-end actor headshot retouch map from this clean original.
@@ -142,7 +144,7 @@ Show the desired retouch direction clearly enough to guide final work on the ori
 Keep real pores, stubble, asymmetry, fabric texture, and masculine character. Avoid waxy skin, broad cheek bleaching, painted eye whites, changed facial proportions, or AI-looking softness.
 ```
 
-Transfer rules:
+Transfer rules (the pipeline enforces these; do not perform them by hand):
 
 - Apply the map to the original, not the original to the map. The original remains the final structure.
 - Use tight masks around eye whites, lower lids, under-eyes, thumb/hand, neck, and blemishes. Do not wash out adjacent cheeks to hide eye problems.
@@ -153,7 +155,7 @@ Transfer rules:
 
 ## Light Regen Mode
 
-Use when deterministic or hybrid-map retouching cannot cleanly fix the photo, especially around tired eyes, under-eye texture, discoloration, or skin tone. This can become the final candidate only when quality, resolution, and authenticity are good enough or the user accepts the tradeoff.
+Rare fallback only. Use when the deterministic hybrid-map transfer genuinely cannot fix the photo, especially around tired eyes, under-eye texture, discoloration, or skin tone. A fully regenerated image is what casting directors punish, so this is never the default. It can become the final candidate only when quality, resolution, and authenticity are good enough or the user explicitly accepts the tradeoff.
 
 Prompt:
 

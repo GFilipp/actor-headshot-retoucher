@@ -1,4 +1,4 @@
 interface:
   display_name: "Actor Headshot Retouch"
-  short_description: "Hybrid-map actor headshot retouching"
-  default_prompt: "Use $actor-headshot-retouch to readiness-check and hybrid-map retouch this actor headshot without losing authenticity."
+  short_description: "Deterministic hybrid-map actor headshot retouching"
+  default_prompt: "Use $actor-headshot-retouch to readiness-check and run the deterministic hybrid-map pipeline on this actor headshot: generate a retouch target, align it to the original, transfer only masked local fixes back, and report the QA gates."
