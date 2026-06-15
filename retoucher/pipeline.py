@@ -8,6 +8,7 @@ original's own texture.
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -76,6 +77,7 @@ def retouch_image(
         feather_px=cfg.feather_px * spatial,
         protect_dilate_px=cfg.protect_dilate_px * spatial,
         skin_erode_px=cfg.skin_erode_px * spatial,
+        guided_radius=max(1, int(round(cfg.guided_radius * spatial))),
     )
 
     # Face geometry drives feature protection + confinement (quality path).
@@ -162,5 +164,11 @@ def retouch_path(
     source = Path(source)
     if source.is_dir():
         files = sorted(p for p in source.iterdir() if p.suffix.lower() in IMAGE_EXTS)
-        return [retouch_image(f, out_dir, generator, cfg, write=write) for f in files]
+        results: list[RetouchResult] = []
+        for f in files:
+            try:
+                results.append(retouch_image(f, out_dir, generator, cfg, write=write))
+            except Exception as exc:  # one bad file shouldn't kill the whole batch
+                print(f"skip {f.name}: {exc}", file=sys.stderr)
+        return results
     return [retouch_image(source, out_dir, generator, cfg, marks=marks, write=write)]

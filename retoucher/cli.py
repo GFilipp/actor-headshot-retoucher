@@ -27,10 +27,14 @@ from .pipeline import retouch_path
 def _parse_marks(mark_pts: list[str], mark_boxes: list[str]) -> list:
     marks: list = []
     for s in mark_pts:
-        v = [float(x) for x in s.split(",")]
+        v = [float(x) for x in s.split(",")]   # raises ValueError on non-numeric
+        if len(v) < 2:
+            raise ValueError(f"--mark needs X,Y[,R]; got {s!r}")
         marks.append(("point", v[0], v[1], v[2] if len(v) > 2 else None))
     for s in mark_boxes:
         v = [float(x) for x in s.split(",")]
+        if len(v) != 4:
+            raise ValueError(f"--mark-box needs X1,Y1,X2,Y2; got {s!r}")
         marks.append(("box", v[0], v[1], v[2], v[3]))
     return marks
 
@@ -118,9 +122,18 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = PipelineConfig(mode=args.mode)
     if args.strength is not None:
-        cfg.tone_strength = args.strength
+        cfg.tone_strength = max(0.0, min(1.0, args.strength))
     if args.max_mp is not None:
+        if args.max_mp <= 0:
+            print("--max-mp must be greater than 0", file=sys.stderr)
+            return 1
         cfg.generator_max_mp = args.max_mp
+
+    try:
+        marks = _parse_marks(args.mark, args.mark_box)
+    except ValueError as exc:
+        print(f"Invalid mark: {exc}", file=sys.stderr)
+        return 1
 
     backend = "mock" if args.dry_run else args.backend
     if backend == "openai":
@@ -129,12 +142,15 @@ def main(argv: list[str] | None = None) -> int:
             print(err, file=sys.stderr)
             return 1
     generator = get_generator(backend, **({"model": args.model} if backend == "openai" else {}))
-    marks = _parse_marks(args.mark, args.mark_box)
 
     try:
         results = retouch_path(source, out_dir, generator, cfg, marks=marks, write=not args.no_write)
     except Exception as exc:
         print(f"Retouch failed: {exc}", file=sys.stderr)
+        return 1
+
+    if not results:
+        print(f"No images found in {source}", file=sys.stderr)
         return 1
 
     if args.json:

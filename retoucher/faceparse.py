@@ -120,9 +120,18 @@ def _probe() -> bool:
     ) % str(_ASSET)
     try:
         r = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=60)
-        return r.returncode == 0 and b"OK" in r.stdout
-    except Exception:
-        return False
+        if r.returncode == 0 and b"OK" in r.stdout:
+            return True
+        reason = f"probe exit {r.returncode}"
+    except Exception as exc:
+        reason = type(exc).__name__
+    # Surface WHY we degraded so a silent quality drop is debuggable.
+    print(
+        f"[retoucher] face parser unavailable ({reason}); using the no-geometry "
+        "fallback. Set RETOUCH_FACE_PARSER=on to skip this probe where MediaPipe works.",
+        file=sys.stderr,
+    )
+    return False
 
 
 def available() -> bool:

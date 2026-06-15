@@ -86,7 +86,7 @@ def discover_latest_image_model(client) -> str:
     models = list(client.models.list().data)
     candidates = [
         m for m in models
-        if str(getattr(m, "id", "")).startswith("gpt-image") and "mini" not in str(m.id)
+        if str(getattr(m, "id", "")).startswith("gpt-image") and "mini" not in str(getattr(m, "id", ""))
     ]
     if not candidates:
         raise RuntimeError("no gpt-image models available to this account")

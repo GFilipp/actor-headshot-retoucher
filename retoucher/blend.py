@@ -78,7 +78,7 @@ def correct_under_eye(rgb: np.ndarray, region: np.ndarray, strength: float, sigm
     surround = cv2.GaussianBlur(L, (0, 0), sigmaX=max(2.0, sigma * 2.0))
     lift = np.clip(surround - L, 0.0, 12.0)                 # darker-than-surroundings, capped (L units)
     lab[..., 0] = L + strength * region * lift              # smooth lift -> texture detail survives
-    lab[..., 2] += strength * region * np.clip(lift, 0.0, 6.0) * 0.3  # ease blue/purple cast
+    lab[..., 2] += strength * region * np.clip(lift, 0.0, 6.0) * 0.3  # ease a blue cast (b* up = warmer)
     return clip01(lab2rgb(lab)).astype(np.float32)
 
 

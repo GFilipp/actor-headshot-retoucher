@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 # Pillow >= 9 exposes Resampling; fall back for older installs.
 try:  # pragma: no cover - trivial shim
@@ -61,7 +61,13 @@ def to_uint16(arr: np.ndarray) -> np.ndarray:
 
 
 def _load_raw(path: Path) -> np.ndarray:
-    import rawpy  # optional; only needed for RAW sources
+    try:
+        import rawpy  # optional; only needed for RAW sources
+    except ImportError as exc:
+        raise RuntimeError(
+            "RAW input needs the optional 'rawpy' package: "
+            "pip install 'actor-headshot-retoucher[advanced]'"
+        ) from exc
 
     with rawpy.imread(str(path)) as raw:
         rgb = raw.postprocess(no_auto_bright=True, output_bps=16, gamma=(2.222, 4.5))
@@ -75,9 +81,9 @@ def load(path: str | Path) -> LoadedImage:
 
     with Image.open(path) as im:
         icc = im.info.get("icc_profile")
-        exif = im.info.get("exif")
-        im = im.convert("RGB")
-        arr = np.asarray(im)
+        im = ImageOps.exif_transpose(im)   # honor orientation, then drop the tag
+        exif = im.info.get("exif")          # from the transposed image (no stale orientation)
+        arr = np.asarray(im.convert("RGB"))
     return LoadedImage(pixels=to_float(arr), icc=icc, exif=exif, source_path=path)
 
 

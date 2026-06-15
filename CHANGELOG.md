@@ -3,6 +3,17 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v2.1.2
+
+Robustness pass from a full bug audit:
+
+- CLI no longer dumps a traceback on bad `--mark` / `--mark-box` / `--strength`; invalid input is a clean error. An image-less directory reports clearly instead of silently "succeeding".
+- RAW input without the optional `rawpy` gives a clear install hint instead of `ModuleNotFoundError`, and one bad file in a batch is skipped instead of aborting the whole run.
+- EXIF orientation is honored on load (no more sideways processing / missed faces on phone shots).
+- `guided_radius` now scales with resolution like the other spatial params (correct edge-aware blend at non-reference sizes).
+- The MediaPipe probe logs *why* it fell back, so a silent quality drop in a sandbox is debuggable.
+- Tiny-crop border suppression can no longer zero the whole blemish map. Added robustness tests (probe/degraded-path/CLI-errors/RAW) — the class of gap that let the sandbox crash through.
+
 ## v2.1.1
 
 - Headless / sandbox safety. MediaPipe can **abort natively** (not a catchable Python exception) during graphics setup in some sandboxes, e.g. Codex, which crashed the whole process. The face parser is now validated in an isolated subprocess before any in-process use; if it would crash, the pipeline silently falls back to the no-geometry path instead of dying. Override with `RETOUCH_FACE_PARSER=off` (force fallback) or `on` (trust it, skip the probe).
