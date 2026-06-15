@@ -8,5 +8,8 @@ build/
 dist/
 .pytest_cache/
 retouch-out/
+# private input photos + local previews (never commit real faces)
+inputs/
+*_preview.png
 # generated demo artifacts (run make_example.py to recreate locally)
 examples/synthetic*

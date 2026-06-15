@@ -5,7 +5,7 @@ import numpy as np
 from skimage.color import rgb2lab
 
 from retoucher.align import align_to_reference
-from retoucher.blend import apply_tone, composite, correct_under_eye
+from retoucher.blend import apply_tone, composite, correct_under_eye, smooth_under_eye_texture
 from retoucher.config import PipelineConfig
 from retoucher.diff import compute_touch_up_map, frequency_separate
 from retoucher.mask import build_masks
@@ -119,3 +119,24 @@ def test_under_eye_corrector_lifts_shadow(original):
     shadow[ue] *= 0.7                                          # simulate tear-trough shadow
     out = correct_under_eye(shadow, geom.under_eye, strength=0.6, sigma=8.0)
     assert luma(out)[ue].mean() > luma(shadow)[ue].mean() + 0.02
+
+
+def test_under_eye_texture_smoothing_softens_crepe_only_in_region(original):
+    geom = fake_geometry()
+    ue = geom.under_eye > 0.5
+    rng = np.random.default_rng(1)
+    # Stamp extra high-frequency "crepe" texture into the tear-trough only.
+    crepe = np.clip(
+        original + (geom.under_eye[..., None] * rng.normal(0, 0.05, original.shape)).astype(np.float32),
+        0, 1,
+    )
+    out = smooth_under_eye_texture(crepe, geom.under_eye, strength=0.6, sigma=8.0)
+
+    def hf(img):
+        _low, high = frequency_separate(img, 8.0)
+        return np.abs(high)
+
+    assert hf(out)[ue].mean() < hf(crepe)[ue].mean() * 0.8     # crepe softened in-region
+    assert hf(out)[ue].mean() > 0.0                            # but not airbrushed flat
+    # Far outside the (feathered) region nothing changes.
+    assert float(np.abs(out[CORNER[0], CORNER[1]] - crepe[CORNER[0], CORNER[1]]).max()) < 1e-6

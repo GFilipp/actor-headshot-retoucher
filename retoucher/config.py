@@ -46,6 +46,8 @@ class PipelineConfig:
     # --- transfer strengths (per edit kind), each in [0, 1] ---
     tone_strength: float = 0.85              # colour/tone (chroma-only) transfer
     under_eye_strength: float = 0.6          # deterministic tear-trough lightening
+    under_eye_texture_strength: float = 0.6  # soften crepey tear-trough texture (HF attenuation)
+    skin_even_strength: float = 0.5          # even skin colour blotches (a*/b* only; L/form/texture kept)
 
     # --- form-preserving tone transfer ---
     neutralize_global_cast: bool = True

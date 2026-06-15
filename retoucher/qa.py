@@ -176,7 +176,7 @@ def run_qa(original, result, masks: RegionMasks, cfg: PipelineConfig) -> QARepor
         _gate_untouched_lpips(original, result, untouched, t.untouched_max_lpips),
         _gate_edited_delta_e(original, result, edited, t.edited_min_delta_e, t.edited_max_delta_e),
         _gate_texture(original, result, t.max_hf_energy_loss),
-        _gate_protected(original, result, masks.protect, t.protected_min_ssim),
+        _gate_protected(original, result, masks.protect_core, t.protected_min_ssim),
     ]
     verdict = "reject" if any(g.status == "fail" for g in gates) else "pass"
     return QAReport(gates=gates, verdict=verdict)

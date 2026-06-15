@@ -3,6 +3,25 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v2.1.4
+
+Stabilizes the proven delivery ops + the Gemini surgical-paste toolkit out of the
+uncommitted working tree (the method actually used to retouch the 20260509 shoot),
+ahead of the v3 north-star rebuild that promotes them into a tested system.
+
+- `blend.py`: `smooth_under_eye_texture` (high-frequency attenuation), `even_skin_tone`
+  (a*/b* evening, L kept so form/texture survive), `whiten_eye_whites` (sclera de-red/
+  yellow + brighten), `reduce_discoloration` (pull red/brown toward a clean skin
+  reference, reduce excess only).
+- `faceparse.py`: `landmarks()` returns the raw 478-pt mesh, for registering a donor/
+  edit back onto the original (surgical paste outside the deterministic pipeline).
+- `config.py` / `cli.py`: `under_eye_texture_strength`, `skin_even_strength` +
+  `--under-eye-texture` / `--skin-even`.
+- `scripts/`: the Gemini surgical-paste toolkit — `gemini_retouch.py`, `surgical_paste.py`
+  (paste/transfer/luma modes, organic rounded masks, colour-match, ECC for non-face
+  regions), `polish_eyes.py`, `face_crop.py`, `detect_blemishes.py`. Ad-hoc one-offs;
+  promoted into the package + tested in v3.0.0.
+
 ## v2.1.3
 
 Fixes a crash and a hang seen running the skill inside a sandbox (Codex):

@@ -156,6 +156,26 @@ def available() -> bool:
     return _PROBE_OK
 
 
+def landmarks(rgb: np.ndarray) -> np.ndarray | None:
+    """Raw 478 face-mesh points as an (N, 2) float array in pixel coords, or None.
+
+    Used to register a generated/edited image back onto the original's face grid
+    (e.g. for surgically pasting a single fixed region)."""
+    if not available():
+        return None
+    try:
+        import mediapipe as mp
+        lm = _get_landmarker()
+        u8 = np.ascontiguousarray(to_uint8(rgb))
+        res = lm.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=u8))
+    except Exception:
+        return None
+    if not res.face_landmarks:
+        return None
+    h, w = rgb.shape[:2]
+    return np.array([[p.x * w, p.y * h] for p in res.face_landmarks[0]], dtype=np.float32)
+
+
 def detect(rgb: np.ndarray) -> FaceGeometry | None:
     if not available():            # never touch MediaPipe in-process if it would crash
         return None

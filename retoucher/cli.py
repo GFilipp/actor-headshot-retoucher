@@ -94,6 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="OpenAI model id. Default: $OPENAI_IMAGE_MODEL or gpt-image-2 (current latest).")
     p.add_argument("--dry-run", action="store_true", help="Use the mock generator (no API, no cost).")
     p.add_argument("--strength", type=float, default=None, help="Tone transfer strength 0..1.")
+    p.add_argument("--under-eye-texture", type=float, default=None,
+                   help="Tear-trough texture smoothing 0..1 (softens crepey/scaly under-eye skin).")
+    p.add_argument("--skin-even", type=float, default=None,
+                   help="Skin colour evening 0..1 (calms blotchiness/redness; keeps form + texture).")
     p.add_argument("--mark", action="append", default=[], metavar="X,Y[,R]",
                    help="Force a fix at a point (pixels; repeatable).")
     p.add_argument("--mark-box", action="append", default=[], metavar="X1,Y1,X2,Y2",
@@ -125,6 +129,10 @@ def main(argv: list[str] | None = None) -> int:
     cfg = PipelineConfig(mode=args.mode)
     if args.strength is not None:
         cfg.tone_strength = max(0.0, min(1.0, args.strength))
+    if args.under_eye_texture is not None:
+        cfg.under_eye_texture_strength = max(0.0, min(1.0, args.under_eye_texture))
+    if args.skin_even is not None:
+        cfg.skin_even_strength = max(0.0, min(1.0, args.skin_even))
     if args.max_mp is not None:
         if args.max_mp <= 0:
             print("--max-mp must be greater than 0", file=sys.stderr)

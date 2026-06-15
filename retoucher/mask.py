@@ -28,7 +28,9 @@ class RegionMasks:
     by_kind: dict[str, np.ndarray]
     skin: np.ndarray
     under_eye: np.ndarray   # lower lid / tear trough for the corrector (0 if no geom)
-    protect: np.ndarray     # features that must not change (0 if no geom); for QA
+    protect: np.ndarray     # dilated feature mask used to keep EDITS off features
+    protect_core: np.ndarray  # raw landmarked features (brows/eyes/lips); what QA must verify
+    face: np.ndarray        # facial skin for skin-tone evening (0 if no geom)
     geom_used: bool
 
     def edited(self) -> np.ndarray:
@@ -128,6 +130,8 @@ def build_masks(
     heal = _marks_mask(tmap, cfg.mark_luma_thresh, cfg.mark_red_thresh, cfg.mark_max_blob_frac)
     under_eye = np.zeros((h, w), np.float32)
     protect = np.zeros((h, w), np.float32)
+    protect_core = np.zeros((h, w), np.float32)
+    face = np.zeros((h, w), np.float32)
 
     # Grow skin slightly so a small blemish (whose own pixels may fail the skin
     # test) is still inside the healable region when surrounded by skin.
@@ -135,7 +139,9 @@ def build_masks(
 
     if geom is not None:
         protect = _dilate(geom.protect, cfg.protect_dilate_px)
+        protect_core = geom.protect              # raw features for the QA gate
         face_in = _erode(geom.face_oval, cfg.skin_erode_px)
+        face = face_in                           # facial skin for tone evening
         tone = tone * face_in                    # inside the face (excludes ears/hair/neck)
         # Heal on skin near the face only (face/neck/upper-collar chest), so
         # skin-coloured clothing down the torso is never edited.
@@ -161,4 +167,5 @@ def build_masks(
 
     by_kind = {"tone": tone_f, "heal": heal_f}
     return RegionMasks(by_kind=by_kind, skin=skin, under_eye=under_eye,
-                       protect=protect, geom_used=geom is not None)
+                       protect=protect, protect_core=protect_core, face=face,
+                       geom_used=geom is not None)
