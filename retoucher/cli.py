@@ -105,11 +105,73 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-mp", type=float, default=None, help="Max megapixels sent to the generator.")
     p.add_argument("--max-process-mp", type=float, default=None,
                    help="Cap working/output megapixels (default 8). Lower it if a big image is slow.")
+    p.add_argument("--engine", default="v2", choices=["v2", "v3"],
+                   help="v2=legacy deterministic pipeline; v3=north-star dynamic hybrid system.")
+    p.add_argument("--samples", type=int, default=2,
+                   help="v3: generative candidates to draw and audit at native res (ship the cleanest).")
+    p.add_argument("--max-escalate", type=int, default=1,
+                   help="v3: bounded audit-driven re-calibration rounds on failing regions.")
     p.add_argument("--no-write", action="store_true", help="Run without writing outputs.")
     p.add_argument("--skip-preflight", action="store_true", help="Skip the readiness check.")
     p.add_argument("--force", action="store_true", help="Run even if preflight fails.")
     p.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     return p
+
+
+_IMG_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp"}
+
+
+def _run_v3(source: Path, out_dir: Path, args) -> int:
+    """North-star engine: analyze -> map -> calibrate -> execute -> audit -> deliver.
+    Audit-gated: an image is written ONLY when every region is clean and identity passes;
+    otherwise a telemetry report is written for inspection (never ship least-bad)."""
+    from .image_io import load, save_versioned
+    from .orchestrator import retouch
+
+    paths = ([source] if source.is_file()
+             else sorted(p for p in source.iterdir() if p.suffix.lower() in _IMG_EXTS))
+    if not paths:
+        print(f"No images found in {source}", file=sys.stderr)
+        return 1
+
+    backend = "mock" if args.dry_run else "gemini"
+    generator = get_generator(backend)
+    jpeg_q = PipelineConfig().jpeg_quality
+    reports, rc = [], 0
+    for p in paths:
+        try:
+            img = load(p)
+            res = retouch(img.pixels, generator=generator,
+                          samples=max(1, args.samples), max_escalate=max(0, args.max_escalate))
+        except Exception as exc:
+            print(f"{p.name}: ERROR {exc}", file=sys.stderr)
+            rc = 1
+            continue
+        reports.append(res.report)
+        status = ("REFUSED" if not res.assessment.handleable
+                  else "DELIVERED" if res.delivered else "FLAGGED")
+        flagged = [v.op_id for v in res.verdicts if not v.clean]
+        if not args.json:
+            print(f"{p.name}: {status}  [{res.assessment.shot_type}, "
+                  f"{len(res.retouch_map.ops)} ops, identity={res.identity['status']}]")
+            if not res.assessment.handleable:
+                print(f"    reason: {res.assessment.reason}")
+            if flagged:
+                print(f"    flagged regions: {', '.join(flagged)}")
+        if not args.no_write:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            rep = out_dir / f"{p.stem}.report.json"
+            rep.write_text(json.dumps(res.report, indent=2))
+            if res.delivered:
+                outp = save_versioned(res.image, out_dir, p.stem, suffix="v3",
+                                      icc=img.icc, exif=img.exif, quality=jpeg_q)
+                if not args.json:
+                    print(f"    output: {outp}")
+            if not args.json:
+                print(f"    report: {rep}")
+    if args.json:
+        print(json.dumps(reports, indent=2))
+    return rc
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -120,6 +182,9 @@ def main(argv: list[str] | None = None) -> int:
     if not source.exists():
         print(f"Source not found: {source}", file=sys.stderr)
         return 1
+
+    if args.engine == "v3":
+        return _run_v3(source, out_dir, args)
 
     if not args.skip_preflight:
         if not _preflight(args.mode, source, out_dir, force=args.force):

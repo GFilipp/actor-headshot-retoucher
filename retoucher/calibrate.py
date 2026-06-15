@@ -161,12 +161,16 @@ def escalate(
         notes.append("seam: wider feather + organic spread")
     if "texture" in fails:
         if "blur" in fails["texture"]["detail"]:
-            mode = "transfer"                       # keep the original skin texture
-            gen = round(gen * 0.6, 2)
-            notes.append("blur: switch to tone-only transfer, lower generative share")
+            if gen > 0:                             # there's a paste smearing texture
+                mode = "transfer"                   # keep the original skin texture
+                gen = round(gen * 0.6, 2)
+            if DET_SMOOTH in strength:              # over-smoothing is itself a blur cause
+                strength[DET_SMOOTH] = round(strength[DET_SMOOTH] * 0.5, 2)
+            notes.append("blur: keep original texture (transfer if pasting), back off smoothing")
         else:                                       # stipple
-            mode = "luma" if mode == "paste" else mode
-            gen = round(gen * 0.7, 2)
+            if gen > 0:
+                mode = "luma" if mode == "paste" else mode
+                gen = round(gen * 0.7, 2)
             if DET_EVEN not in det:
                 det.append(DET_EVEN)
             strength[DET_EVEN] = cfg.det_strength_ceiling

@@ -59,3 +59,63 @@ PROMPTS = {
 def prompt_for(mode: str) -> str:
     """Return the prompt text for a mode, defaulting to the hybrid-map map prompt."""
     return PROMPTS.get(mode, HYBRID_MAP)
+
+
+# --- v3 single-source persona + dynamic, subject-agnostic edit prompt --------------
+# The prompts above are subject-specific (legacy, "masculine character"). The v3 system
+# builds its generation prompt from the actual RetouchMap so it is per-photo and never
+# baked to one person or gender. This is the ONE place the persona lives.
+
+RETOUCH_PERSONA = (
+    "You are a best-in-class film-industry retoucher preparing an actor's photo for "
+    "casting. Work like a high-end commercial retoucher: the result should look rested, "
+    "clean, polished, and marketable, while remaining unmistakably the same person and "
+    "the same photograph."
+)
+
+_IDENTITY_GUARD = (
+    "Preserve exact identity, face shape, bone structure, features, expression, pose, "
+    "crop, camera angle, hair character, wardrobe, background, and the original lighting. "
+    "Keep real pores, skin texture, stubble, asymmetry, moles, brows, and lashes. Do NOT "
+    "create a new portrait, beautify globally, reshape features, or add AI-looking softness."
+)
+
+_DEFECT_PHRASING = {
+    "under_eye": "reduce under-eye crepey texture, scaling, fine lines and puffiness, "
+                 "including the inner-corner tear trough right next to the nose",
+    "crepe": "smooth crepey skin texture while keeping real pores",
+    "discoloration": "neutralize red/brown/purple discoloration",
+    "pigmentation": "even out pigmentation and blotches toward the surrounding clean skin",
+    "blemish": "clean small blemishes and skin marks",
+    "skin_unevenness": "even skin tone without flattening form or texture",
+    "eye_white_cast": "brighten and neutralize the whites of the eyes, keeping them realistic",
+    "flyaway": "tame only distracting flyaway / stray hairs",
+}
+
+_REGION_LABEL = {
+    "eye_area": "eyes", "face": "face", "neck": "neck", "chest": "chest",
+    "hands": "hands / fingers", "hair": "hair",
+}
+
+
+def build_edit_prompt(assessment, retouch_map) -> str:
+    """Dynamic, subject-agnostic generation prompt: persona + identity guard + ONLY the
+    defects the analyze stage actually mapped (grouped by region). Per-photo, never baked
+    to a specific subject."""
+    lines: list[str] = []
+    for op in retouch_map.ops:
+        phr = _DEFECT_PHRASING.get(op.defect)
+        if not phr:
+            continue
+        line = f"- on the {_REGION_LABEL.get(op.region, op.region)}: {phr}"
+        if line not in lines:
+            lines.append(line)
+    if not lines:
+        lines = ["- perform a light, conservative clean-up of visible skin only"]
+    return (
+        f"{RETOUCH_PERSONA}\n\n{_IDENTITY_GUARD}\n\n"
+        "Retouch only these real photographic issues:\n" + "\n".join(lines) + "\n\n"
+        "Make the changes noticeable enough to improve casting value but natural. Before "
+        "finishing, compare before/after at 100%: do not present the result if any listed "
+        "issue is still obvious."
+    )

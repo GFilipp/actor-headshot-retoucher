@@ -161,22 +161,34 @@ def _lash_gate(original, retouched, protect, cfg) -> dict:
 def audit_region(
     original: np.ndarray, retouched: np.ndarray, mask: np.ndarray, *,
     op_id: str = "", skin_ref=None, protect=None, skin=None, geom=None,
-    band_px: float = 6.0, cfg: AuditThresholds | None = None,
+    band_px: float = 6.0, kind: str = "skin", cfg: AuditThresholds | None = None,
 ) -> RegionVerdict:
     """Run every applicable detector at native resolution. `clean` requires that at
-    least one detector ran, none failed, and no REQUIRED detector was skipped."""
+    least one detector ran, none failed, and no REQUIRED detector was skipped.
+
+    `kind` makes the audit region-aware: the skin gates (texture/residual/color) assume a
+    skin region and are NOT applied to an eyeball edit (kind="eyes"), where the meaningful
+    checks are seam, lashes, and the map-level identity gate. Reported skipped, not passed."""
     cfg = cfg or AuditThresholds()
     _assert_native(original, retouched)
     if int(_hard(mask).sum()) < cfg.min_region_px:
         g = _gate("coverage", "skipped", None, None, "region mask empty/too small")
         return RegionVerdict(op_id=op_id, clean=False, gates=[g])
-    gates = [
-        _seam_gate(original, retouched, mask, band_px, cfg),
-        _texture_gate(retouched, mask, skin=skin, band_px=band_px, cfg=cfg),
-        _color_gate(retouched, mask, skin_ref, cfg),
-        _residual_gate(retouched, mask, geom, cfg),
-        _lash_gate(original, retouched, protect, cfg),
-    ]
+    if kind == "eyes":
+        na = lambda n: _gate(n, "skipped", None, None, "not applicable to an eye region", required=False)
+        gates = [
+            _seam_gate(original, retouched, mask, band_px, cfg),
+            na("texture"), na("color"), na("residual"),
+            _lash_gate(original, retouched, protect, cfg),
+        ]
+    else:
+        gates = [
+            _seam_gate(original, retouched, mask, band_px, cfg),
+            _texture_gate(retouched, mask, skin=skin, band_px=band_px, cfg=cfg),
+            _color_gate(retouched, mask, skin_ref, cfg),
+            _residual_gate(retouched, mask, geom, cfg),
+            _lash_gate(original, retouched, protect, cfg),
+        ]
     ran = [g for g in gates if g["status"] != "skipped"]
     failed = [g for g in gates if g["status"] == "fail"]
     req_skipped = [g for g in gates if g["status"] == "skipped" and g["required"]]
@@ -230,7 +242,7 @@ def audit_map(
         out.append(audit_region(
             original, retouched, r["mask"], op_id=r.get("op_id", ""),
             skin_ref=r.get("skin_ref"), protect=r.get("protect"), skin=skin, geom=geom,
-            band_px=r.get("band_px", 6.0), cfg=cfg,
+            band_px=r.get("band_px", 6.0), kind=r.get("kind", "skin"), cfg=cfg,
         ))
     return out
 
