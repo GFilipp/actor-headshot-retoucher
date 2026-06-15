@@ -105,10 +105,11 @@ def _marks_mask(tmap: TouchUpMap, luma_thresh: float, red_thresh: float, max_blo
         return np.zeros_like(tmap.mark_score, np.float32)
     num, labels, stats, _ = cv2.connectedComponentsWithStats(cand, connectivity=8)
     total = cand.size
-    keep = np.zeros_like(cand)
-    for i in range(1, num):
-        if stats[i, cv2.CC_STAT_AREA] <= max_blob_frac * total:  # small; skip big shadows / moles
-            keep[labels == i] = 1
+    # Vectorized: keep small components (skip big shadows/moles + background 0).
+    # A loop here is a real hang on a large noisy image (tens of thousands of blobs).
+    areas = stats[:, cv2.CC_STAT_AREA]
+    keep_labels = np.where((np.arange(num) != 0) & (areas <= max_blob_frac * total))[0]
+    keep = np.isin(labels, keep_labels).astype(np.uint8)
     return cv2.dilate(keep, _kernel(2)).astype(np.float32)
 
 

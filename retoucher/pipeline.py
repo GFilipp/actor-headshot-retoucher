@@ -66,7 +66,9 @@ def retouch_image(
     cfg = cfg or PipelineConfig()
     source_path = Path(source_path)
     loaded = image_io.load(source_path)
-    original = loaded.pixels
+    # Cap the working/output resolution so a huge original can't make the
+    # full-image align/diff/mask/blend/QA stages hang (esp. CPU-only sandboxes).
+    original, process_scale = image_io.resize_to_megapixels(loaded.pixels, cfg.max_process_mp)
 
     # Scale pixel-based params to the image's actual size so behaviour is
     # resolution-independent (an 8px blur on a 4096px file would be useless).
@@ -111,6 +113,7 @@ def retouch_image(
         "source": str(source_path),
         "mode": cfg.mode,
         "spatial_scale": round(spatial, 4),
+        "process_scale": round(process_scale, 4),
         "generator_scale": round(scale, 4),
         "alignment": {"method": align.method, "score": round(align.score, 4), "success": align.success},
         "face_geometry": masks.geom_used,

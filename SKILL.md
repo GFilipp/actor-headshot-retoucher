@@ -121,7 +121,7 @@ Final output must be treated as maximum-quality production work.
 - Never overwrite the original.
 - Save versioned outputs.
 - Save a full-quality master when possible.
-- Preserve full resolution for deterministic retouching.
+- Preserve resolution up to the processing cap (default 8 MP; raise `--max-process-mp` for larger originals). Very large files are downsampled to the cap so the full-image stages stay fast.
 - Export JPEG finals at maximum practical quality, ideally 95-100 with minimal/chroma-safe compression.
 - Use PNG or TIFF for lossless masters when appropriate.
 - Do not present a low-resolution imagegen result as "final" unless the user explicitly accepts that quality tradeoff.

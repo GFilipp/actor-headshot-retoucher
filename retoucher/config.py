@@ -66,6 +66,10 @@ class PipelineConfig:
     edge_gate: float = 0.25                  # downweight tone edits near hard edges
 
     generator_max_mp: float = 1.5
+    # Cap the working/output resolution so a 20MP+ original can't make the
+    # full-image align/diff/mask/blend/QA stages hang (esp. CPU-only sandboxes).
+    # 8 MP (~3500x2300) is plenty for casting/marketing delivery.
+    max_process_mp: float = 8.0
     ecc_iterations: int = 200
     ecc_epsilon: float = 1e-5
     jpeg_quality: int = 96

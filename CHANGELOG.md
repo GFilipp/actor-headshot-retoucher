@@ -3,6 +3,13 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v2.1.3
+
+Fixes a crash and a hang seen running the skill inside a sandbox (Codex):
+
+- **Crash:** MediaPipe aborted natively initializing its Metal/GPU helper where there's no GPU. Now forces `MEDIAPIPE_DISABLE_GPU=1` before MediaPipe loads, so it runs on CPU (verified) and avoids the abort; the subprocess probe remains the fallback.
+- **Hang:** full-resolution originals (20MP+) made the full-image align/diff/mask/blend/QA stages run for minutes. Processing/output is now capped at `max_process_mp` (default 8 MP, `--max-process-mp` to change), and the blemish-component labeling is vectorized (no per-component Python loop). Note: this means very large originals are downsampled to the cap.
+
 ## v2.1.2
 
 Robustness pass from a full bug audit:

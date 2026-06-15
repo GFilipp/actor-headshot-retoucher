@@ -2,6 +2,9 @@
 before: MediaPipe crashing in a sandbox, bad CLI input, RAW without rawpy."""
 from __future__ import annotations
 
+import os
+
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -99,3 +102,27 @@ def test_raw_without_rawpy_gives_clear_error(tmp_path):
     p.write_bytes(b"not really raw")
     with pytest.raises(RuntimeError, match="rawpy"):
         load(p)
+
+
+# --- v2.1.3: headless GPU disable + resolution cap (crash + hang) ------------
+
+def test_faceparse_disables_gpu_on_import():
+    # The env must be set so MediaPipe never tries the Metal path that aborts headless.
+    assert os.environ.get("MEDIAPIPE_DISABLE_GPU") == "1"
+
+
+def test_pipeline_caps_resolution(tmp_path, monkeypatch):
+    # A large original must be downsampled to the cap so the full-image stages
+    # can't hang. Force the degraded path (no MediaPipe) and a tiny cap so the
+    # test is fast while still proving the cap engages and the run completes.
+    monkeypatch.setattr(fp, "detect", lambda rgb: None)
+    big = (np.random.default_rng(0).random((1500, 2000, 3)) * 0.4 + 0.4).astype(np.float32)  # ~3 MP
+    src = tmp_path / "big.png"
+    _save(big, src)
+    cfg = PipelineConfig()
+    cfg.max_process_mp = 1.0                      # below the 3 MP input -> must downscale
+    res = retouch_image(src, tmp_path / "out", MockGenerator(), cfg)
+    assert res.report["process_scale"] < 1.0      # cap engaged
+    h, w = res.result_pixels.shape[:2]
+    assert (h * w) / 1e6 <= 1.05                   # output bounded to the cap
+    assert res.output_path.exists()                # ran to completion (no hang)

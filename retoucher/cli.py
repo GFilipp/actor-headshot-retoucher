@@ -99,6 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mark-box", action="append", default=[], metavar="X1,Y1,X2,Y2",
                    help="Force a fix inside a box (pixels; repeatable).")
     p.add_argument("--max-mp", type=float, default=None, help="Max megapixels sent to the generator.")
+    p.add_argument("--max-process-mp", type=float, default=None,
+                   help="Cap working/output megapixels (default 8). Lower it if a big image is slow.")
     p.add_argument("--no-write", action="store_true", help="Run without writing outputs.")
     p.add_argument("--skip-preflight", action="store_true", help="Skip the readiness check.")
     p.add_argument("--force", action="store_true", help="Run even if preflight fails.")
@@ -128,6 +130,11 @@ def main(argv: list[str] | None = None) -> int:
             print("--max-mp must be greater than 0", file=sys.stderr)
             return 1
         cfg.generator_max_mp = args.max_mp
+    if args.max_process_mp is not None:
+        if args.max_process_mp <= 0:
+            print("--max-process-mp must be greater than 0", file=sys.stderr)
+            return 1
+        cfg.max_process_mp = args.max_process_mp
 
     try:
         marks = _parse_marks(args.mark, args.mark_box)
