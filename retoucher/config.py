@@ -35,6 +35,31 @@ class QAThresholds:
 
 
 @dataclass
+class CalibrationConfig:
+    """Policy thresholds for `calibrate.py` — the per-photo generative-vs-deterministic
+    split. Encodes the rulebook this project learned the hard way: small/low-res faces
+    can't tolerate a raw paste (texture distorts at pixel zoom), pigmentation is chromatic
+    so deterministic 'barely dents' it (generative-led), mild unevenness is deterministic-
+    only, stray hair is generative-only, and identity-sensitive ops cap the generative share.
+    """
+
+    large_face_frac: float = 0.05                          # >= this AND high-res -> raw paste tolerated
+    paste_resolution_classes: tuple[str, ...] = ("native_high",)
+    identity_gen_cap: float = 0.5                          # identity-sensitive ops cap generative share
+    mild_unevenness_sev: float = 0.5                       # below -> deterministic-only
+    feather_frac: float = 0.10                             # feather px = region-bbox diagonal * this
+    mask_grow: float = 1.1                                 # organic mask spread (no straight edges)
+    gen_weight_strong: float = 0.8                         # crepe / under-eye on a big face
+    gen_weight_pigment: float = 0.7                        # pigmentation / discoloration
+    gen_weight_small_face: float = 0.5                     # any generative op on a small/low-res face
+    det_strength_floor: float = 0.25                       # deterministic strength at severity 0
+    det_strength_ceiling: float = 0.7                      # deterministic strength at severity 1
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
 class PipelineConfig:
     mode: str = "hybrid-map"
     # Spatial params are expressed at this reference width and scaled to the
