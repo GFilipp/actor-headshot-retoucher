@@ -3,6 +3,10 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v2.1.1
+
+- Headless / sandbox safety. MediaPipe can **abort natively** (not a catchable Python exception) during graphics setup in some sandboxes, e.g. Codex, which crashed the whole process. The face parser is now validated in an isolated subprocess before any in-process use; if it would crash, the pipeline silently falls back to the no-geometry path instead of dying. Override with `RETOUCH_FACE_PARSER=off` (force fallback) or `on` (trust it, skip the probe).
+
 ## v2.1.0
 
 Fixes from real-headshot A/B testing: feature protection, form-preserving colour, and corrections that no longer depend on the model.

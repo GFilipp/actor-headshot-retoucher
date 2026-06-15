@@ -114,6 +114,7 @@ It falls back to a known model only if the models API is unreachable. The genera
 - Alignment can fail when the generated target differs a lot in pose or expression. The pipeline falls back (ECC, then ORB), flags low confidence, and the identity gate catches drift.
 - The generator must keep the same crop and framing for a clean transfer. The prompts ask for this; a model that recrops will produce weaker results.
 - The quality path needs Python 3.12 + MediaPipe (bundled model) for feature protection and the under-eye corrector. Without a face parser the tool degrades to a skin + edge-gated fallback and flags `face_geometry: false` in the report.
+- Headless / sandboxed environments (e.g. Codex) where MediaPipe aborts during graphics setup are detected automatically (an isolated subprocess probe) and fall back to that path instead of crashing. Force it with `RETOUCH_FACE_PARSER=off`, or `=on` to skip the probe where you know MediaPipe works.
 - Real before/after quality depends on the source photo and the generator. Heals are confined to the face and the area just below it (neck / open-collar chest); for a blemish further down, point at it with `--mark`.
 - Privacy: a real run uploads your image to the generator's API (OpenAI by default); review their data policy first. Offline `--dry-run` and the test suite never leave your machine.
 

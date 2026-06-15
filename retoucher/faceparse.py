@@ -16,6 +16,9 @@ or no face is found, so callers degrade explicitly rather than silently.
 from __future__ import annotations
 
 import atexit
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,6 +47,7 @@ _LEFT_UNDER = [33, 7, 163, 144, 145, 153, 154, 155, 133]
 _RIGHT_UNDER = [362, 382, 381, 380, 374, 373, 390, 249, 263]
 
 _LANDMARKER = None
+_PROBE_OK = None  # cached result of the sandbox-safe MediaPipe subprocess probe
 
 
 @dataclass
@@ -87,8 +91,7 @@ def _close_landmarker() -> None:  # avoid MediaPipe's noisy __del__ at shutdown
     _LANDMARKER = None
 
 
-def available() -> bool:
-    """True if MediaPipe and the bundled model asset are usable."""
+def _basic_available() -> bool:
     try:
         import mediapipe  # noqa: F401
     except Exception:
@@ -96,7 +99,52 @@ def available() -> bool:
     return _ASSET.exists()
 
 
+def _probe() -> bool:
+    """Run FaceLandmarker once in an ISOLATED subprocess.
+
+    MediaPipe can abort *natively* (not a catchable Python exception) on
+    headless / sandboxed macOS — e.g. inside Codex — during its graphics setup.
+    A native abort in a subprocess is contained and just yields a non-zero exit,
+    so this lets us detect "MediaPipe will crash here" and fall back to the
+    no-geometry path WITHOUT taking down the main process.
+    """
+    code = (
+        "import numpy as np, mediapipe as mp\n"
+        "from mediapipe.tasks import python\n"
+        "from mediapipe.tasks.python import vision\n"
+        "o = vision.FaceLandmarkerOptions("
+        "base_options=python.BaseOptions(model_asset_path=r%r), num_faces=1)\n"
+        "lm = vision.FaceLandmarker.create_from_options(o)\n"
+        "lm.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.zeros((64,64,3), np.uint8)))\n"
+        "print('OK')\n"
+    ) % str(_ASSET)
+    try:
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=60)
+        return r.returncode == 0 and b"OK" in r.stdout
+    except Exception:
+        return False
+
+
+def available() -> bool:
+    """True only if MediaPipe can actually run here: asset present AND it survives
+    a sandbox-safe subprocess probe. Override with ``RETOUCH_FACE_PARSER=off|on``
+    (off = never use it; on = trust it and skip the probe)."""
+    global _PROBE_OK
+    env = os.environ.get("RETOUCH_FACE_PARSER", "").strip().lower()
+    if env in ("off", "0", "no", "false", "disable"):
+        return False
+    if not _basic_available():
+        return False
+    if env in ("on", "1", "yes", "true", "force"):
+        return True
+    if _PROBE_OK is None:
+        _PROBE_OK = _probe()
+    return _PROBE_OK
+
+
 def detect(rgb: np.ndarray) -> FaceGeometry | None:
+    if not available():            # never touch MediaPipe in-process if it would crash
+        return None
     try:
         import mediapipe as mp
         landmarker = _get_landmarker()
