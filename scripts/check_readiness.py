@@ -137,6 +137,8 @@ def check_source(path_text: str | None, required: bool) -> Check:
     path = Path(path_text).expanduser()
     if path.is_file() and os.access(path, os.R_OK):
         return Check("Source image readable", "pass", required, str(path))
+    if path.is_dir() and os.access(path, os.R_OK):
+        return Check("Source image readable", "pass", required, f"directory: {path}")
     return Check("Source image readable", "fail", required, f"not readable: {path}")
 
 
