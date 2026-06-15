@@ -23,7 +23,7 @@ Create a high-end actor headshot retouch map from this clean original.
 
 Preserve the actor's exact identity, face shape, eye shape, expression, crop, pose, hair character, hands, wardrobe, background, and studio lighting. Do not create a new portrait.
 
-Show the desired retouch direction clearly enough to guide final work on the original full-resolution file: healthier eyes, cleaner whites, reduced red/brown eyelid discoloration, smoother under-eye scaling and fine lines, cleaner small skin/chest marks, improved neck/thumb/hand discoloration when present, and only distracting flyaway reduction.
+Show the desired retouch direction clearly enough to guide final work on the original full-resolution file: healthier eyes, cleaner whites, reduced red/brown eyelid discoloration, smoother under-eye scaling and fine lines including the inner corner / tear trough right next to the nose, cleaner small skin marks on the face AND visible chest/neck, improved neck/thumb/hand discoloration when present, and only distracting flyaway reduction.
 
 Keep real pores, stubble, asymmetry, fabric texture, and masculine character. Avoid waxy skin, broad cheek bleaching, painted eye whites, changed facial proportions, or AI-looking softness.
 """
@@ -36,7 +36,8 @@ Use the annotated image only as a retouch map showing problem areas. Remove all 
 Preserve the actor's exact identity, facial structure, expression, pose, crop, camera angle, hairstyle, brows, lashes, stubble, moles, sweater, arms, hand shape, background, and original studio lighting. Do not create a new portrait. Do not beautify globally. This is a high-end actor headshot retouch, not a face replacement.
 
 Retouch only the real photographic issues:
-- reduce under-eye crepey texture, scaling, fine lines, puffiness, and dark brown/purple discoloration on both eyes
+- reduce under-eye crepey texture, scaling, fine lines, puffiness, and dark brown/purple discoloration on both eyes, especially the inner corner / tear trough right next to the nose
+- clean small blemishes and marks on visible chest and neck skin, not just the face
 - brighten and neutralize the whites of the eyes while keeping them realistic
 - reduce eyelid discoloration without changing eye shape
 - clean small forehead, bridge, cheek, and skin marks

@@ -15,12 +15,36 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
 from .config import PipelineConfig
 from .generate import get_generator
 from .pipeline import retouch_path
+
+
+def _parse_marks(mark_pts: list[str], mark_boxes: list[str]) -> list:
+    marks: list = []
+    for s in mark_pts:
+        v = [float(x) for x in s.split(",")]
+        marks.append(("point", v[0], v[1], v[2] if len(v) > 2 else None))
+    for s in mark_boxes:
+        v = [float(x) for x in s.split(",")]
+        marks.append(("box", v[0], v[1], v[2], v[3]))
+    return marks
+
+
+def _openai_ready() -> str | None:
+    """Return an error string if the OpenAI backend can't run, else None."""
+    try:
+        import openai  # noqa: F401
+    except ImportError:
+        return ("OpenAI backend needs the 'openai' package: "
+                "pip install 'actor-headshot-retoucher[openai]'  (or use --dry-run).")
+    if not os.environ.get("OPENAI_API_KEY"):
+        return "OPENAI_API_KEY is not set. Run: export OPENAI_API_KEY=sk-...  (or use --dry-run)."
+    return None
 
 
 def _load_readiness():
@@ -65,7 +89,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default=None,
                    help="OpenAI model id. Default: $OPENAI_IMAGE_MODEL or gpt-image-2 (current latest).")
     p.add_argument("--dry-run", action="store_true", help="Use the mock generator (no API, no cost).")
-    p.add_argument("--strength", type=float, default=None, help="Transfer strength 0..1.")
+    p.add_argument("--strength", type=float, default=None, help="Tone transfer strength 0..1.")
+    p.add_argument("--mark", action="append", default=[], metavar="X,Y[,R]",
+                   help="Force a fix at a point (pixels; repeatable).")
+    p.add_argument("--mark-box", action="append", default=[], metavar="X1,Y1,X2,Y2",
+                   help="Force a fix inside a box (pixels; repeatable).")
     p.add_argument("--max-mp", type=float, default=None, help="Max megapixels sent to the generator.")
     p.add_argument("--no-write", action="store_true", help="Run without writing outputs.")
     p.add_argument("--skip-preflight", action="store_true", help="Skip the readiness check.")
@@ -90,15 +118,21 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = PipelineConfig(mode=args.mode)
     if args.strength is not None:
-        cfg.strength = args.strength
+        cfg.tone_strength = args.strength
     if args.max_mp is not None:
         cfg.generator_max_mp = args.max_mp
 
     backend = "mock" if args.dry_run else args.backend
+    if backend == "openai":
+        err = _openai_ready()
+        if err:
+            print(err, file=sys.stderr)
+            return 1
     generator = get_generator(backend, **({"model": args.model} if backend == "openai" else {}))
+    marks = _parse_marks(args.mark, args.mark_box)
 
     try:
-        results = retouch_path(source, out_dir, generator, cfg, write=not args.no_write)
+        results = retouch_path(source, out_dir, generator, cfg, marks=marks, write=not args.no_write)
     except Exception as exc:
         print(f"Retouch failed: {exc}", file=sys.stderr)
         return 1

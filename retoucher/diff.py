@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
+from skimage.color import rgb2lab
 
 
 def frequency_separate(rgb: np.ndarray, sigma: float) -> tuple[np.ndarray, np.ndarray]:
@@ -38,6 +39,7 @@ class TouchUpMap:
     orig_high: np.ndarray   # original high-frequency band (texture, preserved)
     luma_delta: np.ndarray  # luma of low_delta (HxW), where the target lightened tone
     mark_score: np.ndarray  # HxW: original has a dark mark the target removed
+    red_score: np.ndarray   # HxW: model-INDEPENDENT local redness anomaly (red blemishes)
 
 
 def compute_touch_up_map(
@@ -70,10 +72,20 @@ def compute_touch_up_map(
     b = max(2, int(round(sigma)))
     mark_score[:b, :] = mark_score[-b:, :] = mark_score[:, :b] = mark_score[:, -b:] = 0.0
 
+    # Model-INDEPENDENT redness anomaly: pixels locally redder than their
+    # neighbourhood (a* in LAB). Catches inflamed/red blemishes the model may
+    # have ignored, and naturally spares brown moles / freckles. ~20 a*-units of
+    # local excess maps to 1.0.
+    a_star = rgb2lab(np.clip(original_rgb, 0, 1)).astype(np.float32)[..., 1]
+    red_anom = np.clip(a_star - cv2.GaussianBlur(a_star, (0, 0), sigmaX=sigma), 0.0, None)
+    red_score = np.clip(red_anom / 20.0, 0.0, 1.0)
+    red_score[:b, :] = red_score[-b:, :] = red_score[:, :b] = red_score[:, -b:] = 0.0
+
     return TouchUpMap(
         low_delta=low_delta.astype(np.float32),
         orig_low=orig_low.astype(np.float32),
         orig_high=orig_high.astype(np.float32),
         luma_delta=luma_delta.astype(np.float32),
         mark_score=mark_score.astype(np.float32),
+        red_score=red_score.astype(np.float32),
     )

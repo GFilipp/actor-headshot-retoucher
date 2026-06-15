@@ -15,10 +15,11 @@ This tool takes a third path. A generative model proposes a retouched **target**
 
 The generated target is treated as **direction, not pixels**.
 
-- Tone and colour fixes (under-eye discoloration, eyelids, neck, hands) transfer as a low-frequency delta. The original's high-frequency texture is re-added on top, so pores and stubble are untouched.
-- Marks and blemishes are healed from the original's own surrounding texture, never from the generated image. Generated skin is lower resolution and fabricated; importing it is what makes AI retouches look plastic.
+- Colour/tone fixes move only chroma (a*/b* in LAB) and keep the original luminance, so 3D form (the nose, cheekbones) is never flattened. An edge-aware guided filter blends them with no visible patch.
+- Marks and blemishes are healed from the original's own surrounding texture, never the generated image. Reddish/pigmented blemishes are caught too, not just dark spots.
+- Facial features are protected: brows, eyes, lashes, lips, and nostrils are never edited; tone edits stay inside the face, so ears, hair, and clothing are left alone.
+- Under-eye / tear-trough shadow is lifted by a dedicated corrector that runs regardless of what the model proposed, so it is actually addressed.
 - Any uniform colour cast the model adds is removed before transfer, so complexion never drifts.
-- Edits are confined to masked regions, so nothing leaks into cheeks, eye whites, or background.
 
 ## How it works
 
@@ -47,16 +48,17 @@ Every run is graded automatically. A gate whose optional backend is missing is r
 | `untouched_lpips` | perceptual distance off-edit | LPIPS/torch (optional) |
 | `edited_delta_e` | the edit is visible (CIEDE2000) and not a cartoon | core |
 | `texture` | high-frequency energy not lost (no plastic skin) | core |
+| `protected_features` | brows / eyes / lips unchanged (no feature damage) | MediaPipe |
 
 ## Install
 
-Core pipeline (everything above runs on these four):
+Requires **Python 3.12** (MediaPipe ships wheels there; 3.14 does not yet). The core install includes the bundled face parser used for feature protection and the under-eye corrector — no model download at runtime.
 
 ```bash
 python -m pip install .
 ```
 
-Optional stronger masks and gates (face-landmark regions, identity check, perceptual check, RAW input):
+Optional heavier gates (identity check, perceptual check, RAW input):
 
 ```bash
 python -m pip install ".[advanced]"
@@ -77,6 +79,9 @@ retoucher headshot.jpg --dry-run --out-dir out
 
 # Real run against OpenAI:
 retoucher headshot.jpg --mode hybrid-map --out-dir out
+
+# Force a fix where you point (a blemish the model missed):
+retoucher headshot.jpg --mark 980,1420 --out-dir out
 
 # Batch a whole shoot:
 retoucher ./shoot --out-dir ./shoot-retouched
@@ -108,8 +113,8 @@ It falls back to a known model only if the models API is unreachable. The genera
 
 - Alignment can fail when the generated target differs a lot in pose or expression. The pipeline falls back (ECC, then ORB), flags low confidence, and the identity gate catches drift.
 - The generator must keep the same crop and framing for a clean transfer. The prompts ask for this; a model that recrops will produce weaker results.
-- Face-region masks are most precise with the optional MediaPipe backend; without it the tool edits where the target proposed a change, refined by a skin estimate.
-- The demo image is synthetic. Real before/after quality depends on the source photo and the generator.
+- The quality path needs Python 3.12 + MediaPipe (bundled model) for feature protection and the under-eye corrector. Without a face parser the tool degrades to a skin + edge-gated fallback and flags `face_geometry: false` in the report.
+- Real before/after quality depends on the source photo and the generator. Heals are confined to the face and the area just below it (neck / open-collar chest); for a blemish further down, point at it with `--mark`.
 - Privacy: a real run uploads your image to the generator's API (OpenAI by default); review their data policy first. Offline `--dry-run` and the test suite never leave your machine.
 
 ## Repository layout
@@ -137,4 +142,4 @@ python -m pip install -e ".[dev]"
 pytest tests -q
 ```
 
-Tests run fully offline with a mock generator, so no API key or network is needed. They bootstrap the package onto the path, so `pytest` and `python examples/make_example.py` work straight from a clone even without installing. (Editable installs have a known import-resolution quirk on the Python 3.14 preview; use a regular `pip install` there. Supported and CI-tested on 3.10 to 3.12.)
+Tests run fully offline with a mock generator (no API key or network). They bootstrap the package onto the path, so `pytest` and `python examples/make_example.py` work straight from a clone. Requires Python 3.12 (MediaPipe wheels); CI runs on 3.12.

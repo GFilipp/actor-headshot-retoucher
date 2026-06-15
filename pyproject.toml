@@ -4,22 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actor-headshot-retoucher"
-version = "2.0.0"
+version = "2.1.0"
 description = "Deterministic, identity-preserving headshot retouch pipeline (generate target, transfer back to original)."
-requires-python = ">=3.10"
+# Pinned to 3.12: MediaPipe (required for feature protection) ships wheels here;
+# 3.14 has no MediaPipe wheels yet.
+requires-python = ">=3.12,<3.13"
 license = { text = "MIT" }
 dependencies = [
     "numpy>=1.24",
     "pillow>=10.0",
-    "opencv-python-headless>=4.8",
+    "opencv-contrib-python-headless>=4.8",  # base + ximgproc (guided filter)
     "scikit-image>=0.21",
+    "mediapipe>=0.10",                       # face geometry: feature protection + under-eye
 ]
 
 [project.optional-dependencies]
-# Stronger masks + quality gates. Optional because they pull in heavy deps and
-# may lag new Python releases; the pipeline degrades gracefully without them.
+# Heavier extras; the pipeline degrades gracefully without them.
 advanced = [
-    "mediapipe>=0.10",       # face-landmark region masks
     "insightface>=0.7",      # ArcFace identity gate
     "onnxruntime>=1.16",     # insightface runtime
     "lpips>=0.1",            # perceptual untouched-region gate
@@ -33,3 +34,6 @@ retoucher = "retoucher.cli:main"
 
 [tool.setuptools]
 packages = ["retoucher"]
+
+[tool.setuptools.package-data]
+retoucher = ["assets/*.task"]
