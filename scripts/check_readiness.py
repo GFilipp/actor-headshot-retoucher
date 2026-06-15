@@ -43,7 +43,8 @@ CORE_IMPORTS = [
 # Optional: stronger masks / quality gates / inputs. Missing ones are reported,
 # never blocking; the pipeline degrades gracefully.
 OPTIONAL_IMPORTS = [
-    ("MediaPipe", "mediapipe"),
+    ("MediaPipe", "mediapipe"),    # quality path: feature protection (Python 3.12)
+    ("OpenAI SDK", "openai"),      # required only for --backend openai
     ("InsightFace", "insightface"),
     ("LPIPS", "lpips"),
     ("rawpy", "rawpy"),

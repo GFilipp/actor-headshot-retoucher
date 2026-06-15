@@ -3,7 +3,6 @@
 # and can lag the newest Python releases.
 -r requirements.txt
 
-mediapipe>=0.10      # face-landmark region masks (precise under-eye/lids/eyes)
 insightface>=0.7     # ArcFace identity-preservation gate
 onnxruntime>=1.16    # insightface runtime
 lpips>=0.1           # perceptual untouched-region gate (needs torch)

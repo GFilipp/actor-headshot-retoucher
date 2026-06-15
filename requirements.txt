@@ -1,9 +1,10 @@
-# Core pipeline (required). Lower bounds are the tested floor; pin exactly in a
-# lockfile for reproducible production installs.
+# Core pipeline (required), Python 3.12. Lower bounds are the tested floor; pin
+# exactly in a lockfile for reproducible production installs.
 numpy>=1.24
 pillow>=10.0
-opencv-python-headless>=4.8
+opencv-contrib-python-headless>=4.8   # base + ximgproc (guided filter)
 scikit-image>=0.21
+mediapipe>=0.10                       # face geometry: feature protection + under-eye
 
 # Optional generator backend (only for real OpenAI runs; --dry-run needs none):
 # openai>=1.0

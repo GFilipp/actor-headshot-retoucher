@@ -121,6 +121,17 @@ def _gate_untouched_lpips(original, result, untouched, thr) -> Gate:
         return Gate("untouched_lpips", "skipped", None, thr, f"lpips error: {exc}")
 
 
+def _gate_protected(original, result, protect, thr) -> Gate:
+    """Brows / eyes / lips must stay essentially unchanged. Skipped without geometry."""
+    hard = protect > 0.5
+    if int(hard.sum()) < 50:
+        return Gate("protected_features", "skipped", None, thr, "no face geometry")
+    _, smap = structural_similarity(_gray(original), _gray(result), data_range=1.0, full=True)
+    score = float(smap[hard].mean())
+    status = "pass" if score >= thr else "fail"
+    return Gate("protected_features", status, round(score, 4), thr, "brows/eyes/lips unchanged")
+
+
 def contact_sheet(original, result, masks: RegionMasks, out_path: Path, max_crops: int = 3) -> Path:
     """Full-frame before/after plus 100% crops around the largest edits."""
     def col(img):
@@ -165,6 +176,7 @@ def run_qa(original, result, masks: RegionMasks, cfg: PipelineConfig) -> QARepor
         _gate_untouched_lpips(original, result, untouched, t.untouched_max_lpips),
         _gate_edited_delta_e(original, result, edited, t.edited_min_delta_e, t.edited_max_delta_e),
         _gate_texture(original, result, t.max_hf_energy_loss),
+        _gate_protected(original, result, masks.protect, t.protected_min_ssim),
     ]
     verdict = "reject" if any(g.status == "fail" for g in gates) else "pass"
     return QAReport(gates=gates, verdict=verdict)

@@ -102,11 +102,13 @@ Run hybrid-map through the package rather than editing pixels by instruction:
 
 ```bash
 retoucher /path/to/source.jpg --mode hybrid-map --out-dir /path/to/outputs
+# force a fix at a spot the model/auto-detection missed (pixels):
+retoucher /path/to/source.jpg --mark 980,1420 --out-dir /path/to/outputs
 # offline smoke with no API key:
 retoucher /path/to/source.jpg --dry-run --out-dir /path/to/outputs
 ```
 
-The pipeline aligns the generated target to the original (ECC, ORB fallback), separates tone from texture, masks the intended regions, transfers the masked low-frequency delta while keeping the original's texture, heals marks from surrounding original pixels, and writes a JSON report plus a contact sheet. The model output is direction only; it is never the final pixels.
+The pipeline (Python 3.12) detects face geometry, protects features (brows, eyes, lashes, lips, nostrils), aligns the generated target to the original (ECC, ORB fallback), transfers only the chroma (colour) delta while keeping the original luminance so facial form is preserved, heals marks (dark and reddish) from surrounding original pixels, lifts under-eye / tear-trough shadow, and writes a JSON report plus a contact sheet. Tone edits stay inside the face; heals stay on skin near the face. If a defect is missed, point at it with `--mark`. The model output is direction only; it is never the final pixels.
 
 For local retouching, treat each correction like a layer/mask operation: area, mask or selection, operation, strength, and expected visible result. Avoid global smoothing unless the entire image genuinely needs it.
 
