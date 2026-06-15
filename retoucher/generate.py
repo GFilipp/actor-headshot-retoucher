@@ -163,11 +163,96 @@ class OpenAIGenerator:
         return to_float(arr)
 
 
+# Google Gemini image models, newest-first. The Generative Language *auth* keys
+# (AQ.* prefix) block models.list, so we try known ids in order rather than discover.
+FALLBACK_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+GEMINI_IMAGE_MODELS = [
+    "gemini-2.5-flash-image",
+    "gemini-2.5-flash-image-preview",
+    "gemini-2.0-flash-preview-image-generation",
+    "gemini-2.0-flash-exp-image-generation",
+]
+DEFAULT_GEMINI_KEY_FILE = "~/Desktop/gemini.txt"
+
+
+class GeminiGenerator:
+    """Google Gemini image-edit backend behind the same one-method seam.
+
+    Key resolution: ``$GEMINI_API_KEY`` / ``$GOOGLE_API_KEY``, else a key file
+    (default ``~/Desktop/gemini.txt``). Prompt-agnostic — the caller supplies the
+    persona/instruction, so there is no photo-specific prompt baked in here.
+    """
+
+    def __init__(self, model: str | None = None, key_path: str = DEFAULT_GEMINI_KEY_FILE,
+                 max_edge: int = 1536):
+        self.pinned_model = model
+        self.key_path = key_path
+        self.max_edge = max_edge
+
+    def _key(self) -> str:
+        for env in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+            if os.environ.get(env):
+                return os.environ[env]
+        path = os.path.expanduser(self.key_path)
+        if os.path.exists(path):
+            return open(path).read().strip()
+        raise RuntimeError(
+            "No Gemini key: set $GEMINI_API_KEY/$GOOGLE_API_KEY or place it in "
+            f"{self.key_path}."
+        )
+
+    def edit(self, image_rgb: np.ndarray, prompt: str) -> np.ndarray:
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError as exc:  # pragma: no cover - depends on env
+            raise RuntimeError(
+                "The 'google-genai' package is required for GeminiGenerator "
+                "(pip install google-genai), or run with --dry-run / a MockGenerator."
+            ) from exc
+
+        client = genai.Client(api_key=self._key())
+        img = Image.fromarray(to_uint8(image_rgb))
+        if self.max_edge and max(img.size) > self.max_edge:
+            s = self.max_edge / max(img.size)
+            img = img.resize((round(img.width * s), round(img.height * s)))
+
+        models = [self.pinned_model] if self.pinned_model else GEMINI_IMAGE_MODELS
+        configs = [
+            types.GenerateContentConfig(response_modalities=["IMAGE"]),
+            types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
+            None,
+        ]
+        last = ""
+        for m in models:
+            for cfg in configs:
+                try:
+                    resp = client.models.generate_content(model=m, contents=[prompt, img], config=cfg)
+                    for cand in getattr(resp, "candidates", None) or []:
+                        for part in getattr(getattr(cand, "content", None), "parts", None) or []:
+                            inl = getattr(part, "inline_data", None)
+                            if inl and getattr(inl, "data", None):
+                                with Image.open(io.BytesIO(inl.data)) as im:
+                                    return to_float(np.asarray(im.convert("RGB")))
+                    last = f"{m}: no image in response"
+                except Exception as e:  # pragma: no cover - network/SDK dependent
+                    last = f"{m}: {type(e).__name__} {str(e)[:120]}"
+        raise RuntimeError(f"Gemini produced no image. Last: {last}")
+
+
+def edit_n(generator: Generator, image_rgb: np.ndarray, prompt: str, n: int = 1) -> list[np.ndarray]:
+    """Draw ``n`` candidates from a generator. Gemini is stochastic and some samples
+    carry artifacts (stipple) — sample, then let the self-audit pick the cleanest."""
+    return [generator.edit(image_rgb, prompt) for _ in range(max(1, int(n)))]
+
+
 def get_generator(name: str = "openai", **kwargs) -> Generator:
-    """Factory so the CLI can pick a backend by name."""
+    """Factory so the CLI / router can pick a backend by name."""
     name = (name or "openai").lower()
     if name in {"mock", "dry-run", "dryrun", "none"}:
         return MockGenerator()
     if name == "openai":
         return OpenAIGenerator(**kwargs)
+    if name in {"gemini", "google"}:
+        return GeminiGenerator(**kwargs)
     raise ValueError(f"Unknown generator backend: {name!r}")
