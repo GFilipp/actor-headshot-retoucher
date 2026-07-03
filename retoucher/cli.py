@@ -106,12 +106,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-mp", type=float, default=None, help="Max megapixels sent to the generator.")
     p.add_argument("--max-process-mp", type=float, default=None,
                    help="Cap working/output megapixels (default 8). Lower it if a big image is slow.")
-    p.add_argument("--engine", default="v2", choices=["v2", "v3"],
-                   help="v2=legacy deterministic pipeline; v3=north-star dynamic hybrid system.")
+    p.add_argument("--engine", default="v2", choices=["v2", "v3", "surgical"],
+                   help="v2=legacy deterministic pipeline; surgical=the proven one-region "
+                        "donor recipe (recommended for real photos); v3=experimental "
+                        "whole-photo automation.")
     p.add_argument("--samples", type=int, default=2,
-                   help="v3: generative candidates to draw and audit at native res (ship the cleanest).")
+                   help="v3/surgical: generative candidates to draw and audit at native res "
+                        "(keep the cleanest).")
     p.add_argument("--max-escalate", type=int, default=1,
                    help="v3: bounded audit-driven re-calibration rounds on failing regions.")
+    p.add_argument("--region", default="periorbital", choices=["periorbital", "under_eye", "face"],
+                   help="surgical: the ONE region to composite from the donor.")
+    p.add_argument("--composite", default="paste", choices=["paste", "transfer", "luma"],
+                   help="surgical: composite mode (paste erases/carries texture; luma keeps "
+                        "original color; transfer keeps original texture).")
+    p.add_argument("--whites", type=float, default=0.55, help="surgical: eye-white polish 0..1.")
+    p.add_argument("--discolor", type=float, default=0.6,
+                   help="surgical: de-discoloration polish toward clean skin 0..1.")
+    p.add_argument("--lines", type=float, default=0.2,
+                   help="surgical: residual fine-line softening 0..1.")
     p.add_argument("--no-write", action="store_true", help="Run without writing outputs.")
     p.add_argument("--skip-preflight", action="store_true", help="Skip the readiness check.")
     p.add_argument("--force", action="store_true",
@@ -190,6 +203,62 @@ def _run_v3(source: Path, out_dir: Path, args) -> int:
     return rc
 
 
+def _run_surgical(source: Path, out_dir: Path, args) -> int:
+    """The proven one-region recipe (donor -> register -> color-match -> composite ->
+    polish), with the region audited at native res as a CHECK. Operator judges the image,
+    so it is always written (suffix 'surgical') alongside the telemetry report."""
+    from .image_io import load, save_versioned
+    from .surgical import surgical_retouch
+
+    paths = ([source] if source.is_file()
+             else sorted(p for p in source.iterdir() if p.suffix.lower() in _IMG_EXTS))
+    if not paths:
+        print(f"No images found in {source}", file=sys.stderr)
+        return 1
+
+    generator = get_generator("mock" if args.dry_run else "gemini")
+    cfg = PipelineConfig()
+    if args.max_process_mp is not None:
+        if args.max_process_mp <= 0:
+            print("--max-process-mp must be greater than 0", file=sys.stderr)
+            return 1
+        cfg.max_process_mp = args.max_process_mp
+    reports, rc = [], 0
+    for p in paths:
+        try:
+            img = load(p)
+            res = surgical_retouch(
+                img.pixels, generator=generator, region=args.region, mode=args.composite,
+                samples=max(1, args.samples), whites=args.whites, discolor=args.discolor,
+                lines=args.lines, pipe_cfg=cfg)
+        except Exception as exc:
+            print(f"{p.name}: ERROR {type(exc).__name__}: {exc}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            rc = 1
+            continue
+        reports.append(res.report)
+        if not args.json:
+            if not res.handleable:
+                print(f"{p.name}: REFUSED  [{res.report.get('reason', '')}]")
+            else:
+                status = "clean" if res.verdict and res.verdict.clean else "FLAGGED (inspect)"
+                print(f"{p.name}: {args.region}/{args.composite} -> audit {status}")
+        if not args.no_write:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            rep = out_dir / f"{p.stem}.surgical.report.json"
+            rep.write_text(json.dumps(res.report, indent=2))
+            if res.handleable:
+                outp = save_versioned(res.image, out_dir, p.stem, suffix="surgical",
+                                      icc=img.icc, exif=img.exif, quality=cfg.jpeg_quality)
+                if not args.json:
+                    print(f"    output: {outp}")
+            if not args.json:
+                print(f"    report: {rep}")
+    if args.json:
+        print(json.dumps(reports, indent=2))
+    return rc
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     source = Path(args.source).expanduser()
@@ -198,6 +267,9 @@ def main(argv: list[str] | None = None) -> int:
     if not source.exists():
         print(f"Source not found: {source}", file=sys.stderr)
         return 1
+
+    if args.engine == "surgical":
+        return _run_surgical(source, out_dir, args)
 
     if args.engine == "v3":
         return _run_v3(source, out_dir, args)
