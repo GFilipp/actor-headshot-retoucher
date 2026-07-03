@@ -29,6 +29,22 @@ def test_v3_engine_dry_run_offline_writes_report(tmp_path):
     assert (out / "head.report.json").exists()
 
 
+def test_v3_max_process_mp_reaches_engine(monkeypatch, tmp_path):
+    # The flag was silently ignored on the v3 path (footgun): _run_v3 must pass pipe_cfg.
+    src = tmp_path / "head.png"
+    Image.fromarray(to_uint8(make_original())).save(src)
+    captured = {}
+
+    def fake_retouch(rgb, **kw):
+        captured.update(kw)
+        raise RuntimeError("captured; stop here")
+
+    monkeypatch.setattr("retoucher.orchestrator.retouch", fake_retouch)
+    main([str(src), "--engine", "v3", "--dry-run", "--max-process-mp", "2.5",
+          "--out-dir", str(tmp_path / "out"), "--skip-preflight"])
+    assert captured["pipe_cfg"].max_process_mp == 2.5
+
+
 def test_v3_force_writes_image_even_when_not_delivered(tmp_path):
     # --force writes the result for inspection even when the audit doesn't pass (here the
     # synthetic image refuses). Default (no --force) writes only the report, never the image.

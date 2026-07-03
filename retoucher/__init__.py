@@ -26,6 +26,7 @@ from .pipeline import retouch_image, retouch_path
 from .schema import (
     CalibrationRecord, PhotoAssessment, RegionVerdict, RetouchMap, RetouchOp,
 )
+from .surgical import SurgicalResult, surgical_retouch
 
 # Single source of truth is pyproject.toml; read it from installed metadata.
 try:
@@ -34,6 +35,9 @@ except PackageNotFoundError:  # running from a source tree without install
     __version__ = "0.0.0+source"
 
 __all__ = [
+    # surgical engine (the proven real-photo recipe)
+    "surgical_retouch",
+    "SurgicalResult",
     # v3 system
     "retouch",
     "RetouchOutcome",

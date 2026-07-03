@@ -98,7 +98,7 @@ _REGION_LABEL = {
 }
 
 
-def build_edit_prompt(assessment, retouch_map) -> str:
+def build_edit_prompt(retouch_map) -> str:
     """Dynamic, subject-agnostic generation prompt: persona + identity guard + ONLY the
     defects the analyze stage actually mapped (grouped by region). Per-photo, never baked
     to a specific subject."""
@@ -119,3 +119,15 @@ def build_edit_prompt(assessment, retouch_map) -> str:
         "finishing, compare before/after at 100%: do not present the result if any listed "
         "issue is still obvious."
     )
+
+
+# The donor prompt for the surgical engine (the recipe that delivered the 20260509 shoot):
+# regenerate the whole photo, but ONLY the eye-area work is harvested by the compositor,
+# so flaws elsewhere in the donor are irrelevant. Subject-agnostic, single-source persona.
+SURGICAL_UNDER_EYE = (
+    f"{RETOUCH_PERSONA}\n\n{_IDENTITY_GUARD}\n\n"
+    "Retouch the eye area: reduce under-eye crepey texture, scaling, fine lines and "
+    "puffiness including the inner-corner tear trough right next to the nose; neutralize "
+    "red/brown/purple discoloration around both eyes; brighten and neutralize the whites "
+    "of the eyes while keeping them realistic."
+)

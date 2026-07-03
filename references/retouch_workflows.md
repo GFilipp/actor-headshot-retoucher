@@ -1,5 +1,10 @@
 # Retouch Workflows
 
+> **Legacy v2 reference.** This file describes only the `--engine v2` modes
+> (light-retouch / hybrid-map / light-regen). For the recommended surgical engine and the
+> experimental v3 automation, read `METHODOLOGY.md`; the operative prompts live in
+> `retoucher/prompts.py`.
+
 Use this reference after the readiness gate passes. The job is commercial actor retouching, not generic beautification.
 
 ## Contents

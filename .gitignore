@@ -8,6 +8,8 @@ build/
 dist/
 .pytest_cache/
 retouch-out/
+out*/
+*.report.json
 # private input photos + local previews (never commit real faces)
 inputs/
 *_preview.png

@@ -11,6 +11,11 @@ casting-grade, identity-true retouch and a trustworthy clean/not-clean verdict, 
 human pixel-peeping required. Model-agnostic, holistic (the whole picture, not just the
 face), and calibrated per photo.
 
+That is the goal the v3 automation builds toward, not a claim it has earned: on its one
+real-photo run it over-edited (many small auto-composites) and was correctly caught by its
+own audit. Today the supported real-photo path is **the surgical session** (below) — the
+recipe that actually delivered the 20260509 shoot — with the audit as the check.
+
 ## The four contracts
 
 Each is a typed object that survives into the JSON telemetry report, so every run is
@@ -23,8 +28,9 @@ auditable and replayable.
    inventory; local CV corroborates and supplies geometry and the face-count guard. If the
    photo cannot be handled, the contract is refuse-and-flag, never crash.
 2. **RetouchMap** (`schema.py`). An ordered list of `RetouchOp(region, defect, severity,
-   bbox, identity_sensitive)` spanning every in-scope region, sorted identity-safe and
-   high-severity first.
+   bbox, identity_sensitive)` spanning every in-scope region, sorted highest-severity
+   first (identity sensitivity is enforced downstream by Calibrate, which caps the
+   generative share on identity-sensitive ops).
 3. **Calibrate** (`retoucher/calibrate.py`). Per op, a decided `CalibrationRecord`: the
    generative-vs-deterministic split, composite mode, mask shape, feather, strengths, and a
    written rationale. It is a pure policy function of the defect, severity, face size,
@@ -104,13 +110,47 @@ three-quarter angles, heavy occlusion, background, other body skin.
   than relying on auto-detection. The face / eye-area locates reliably via landmarks; the hand
   does not.
 
+## The surgical session (the supported real-photo path)
+
+One targeted pass, operator in the loop — the recipe that delivered the 20260509 shoot,
+runnable as `--engine surgical` (`retoucher/surgical.py`):
+
+1. **Donor.** Gemini regenerates the photo (K samples — the model is stochastic). Flaws in
+   regions you are not harvesting are irrelevant.
+2. **Register + color-match.** Landmark-affine (or ECC) registration onto the original,
+   then LAB color-match to clean face skin so the donor's cast (rouge) never enters.
+3. **Composite ONE region.** An organic rounded mask (`periorbital` by default), wide
+   feather, features re-protected AFTER feathering. Mode per the photo:
+   - `paste` — the donor's pixels; erases texture defects (crepe, bags). Large/high-res
+     faces only; never across a silhouette edge; never over nails or features.
+   - `luma` — the donor's luminance, the original's color. Crepe fix without color risk.
+   - `transfer` — low-frequency tone only, original texture kept. Small/low-res faces.
+4. **Polish.** Light deterministic finish: eye whites, de-discoloration toward clean
+   reference skin, residual fine lines (`--whites/--discolor/--lines`).
+5. **Audit as a check.** The region is audited at nearest-neighbor native resolution
+   (seam/texture/color/residual/lashes); the cleanest of the K donors is kept, the
+   verdict is reported, and the operator judges the image. Refine, or accept.
+
+```bash
+# Real run (Gemini donor; reads ~/Desktop/gemini.txt or $GEMINI_API_KEY):
+.venv312/bin/python -m retoucher INPUT --engine surgical --samples 2 --out-dir out
+# knobs: --region periorbital|under_eye|face   --composite paste|luma|transfer
+#        --whites/--discolor/--lines            defaults = the proven recipe
+```
+
+Hands, neck, chest: work from a tight crop so the donor is sharp at that scale, keep masks
+inside the silhouette, and expect reduction rather than erasure (see Known limitations).
+
 ## Running it
 
 ```bash
 # Offline, no API, no cost (mock generator + mock assessor):
-.venv312/bin/python -m retoucher INPUT --engine v3 --dry-run --out-dir out
+.venv312/bin/python -m retoucher INPUT --engine surgical --dry-run --out-dir out
 
-# Real run (Gemini proposer; reads ~/Desktop/gemini.txt or $GEMINI_API_KEY):
+# Recommended real run — the surgical session:
+.venv312/bin/python -m retoucher INPUT --engine surgical --samples 2 --out-dir out
+
+# Experimental whole-photo automation (audit-gated; not yet trusted unattended):
 .venv312/bin/python -m retoucher INPUT --engine v3 --samples 3 --out-dir out
 ```
 

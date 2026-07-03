@@ -5,28 +5,39 @@ A retouching tool for actor headshots, body shots, and marketing assets that fix
 - Full AI regeneration looks fake and shifts identity. Casting directors punish that.
 - Minimal automated touch-ups miss the real defects or smear them.
 
-The v3 engine takes a third path, calibrated per photo. A best-in-class film-retoucher persona analyzes the whole picture, builds a holistic retouch map (face and hands, neck, chest, hair), decides per region how much to regenerate versus fix deterministically, and self-audits at native resolution before it will deliver. The generative model carries the real fix where only it can (crepe, pigment, stray hair); deterministic code finishes the rest and the surgical compositor keeps the original's texture and likeness.
+The tool takes a third path: a generative model proposes what good looks like, and only the working part is surgically composited back onto the full-resolution original, so texture, likeness, and lighting stay real. A native-resolution self-audit checks the result.
 
 The system of record is [`METHODOLOGY.md`](METHODOLOGY.md). The pre-delivery checklist is [`RULES.md`](RULES.md). The failure log that produced the rules is [`references/retouch_learnings.md`](references/retouch_learnings.md).
 
-## How v3 works
+## The surgical engine (recommended for real photos)
+
+The recipe that delivered real casting photos: regenerate a donor, register it to the original, color-match it to clean face skin, composite ONE organic region (paste / luma / transfer, features protected after feathering), polish lightly, and audit the region at native resolution as a check. The operator stays in the loop and judges the result.
+
+```bash
+# Offline smoke (mock generator, no API, no cost):
+retoucher INPUT --engine surgical --dry-run --out-dir out
+
+# Real run (Gemini donor; reads ~/Desktop/gemini.txt or $GEMINI_API_KEY):
+retoucher INPUT --engine surgical --samples 2 --out-dir out
+# knobs: --region periorbital|under_eye|face  --composite paste|luma|transfer
+#        --whites/--discolor/--lines (polish), defaults = the proven recipe
+```
+
+## The v3 engine (experimental whole-photo automation)
 
 Four typed contracts, each surviving into the JSON telemetry so every run is auditable:
 
 1. **Analyze** — whole-photo assessment (shot type, face size, resolution, lighting, subjects, per-region clean-skin refs) and a defect map. VLM proposes, local CV corroborates. Unhandleable photos are flagged, never crashed.
-2. **RetouchMap** — ordered ops across every in-scope region, identity-safe first.
+2. **RetouchMap** — ordered ops across every in-scope region, highest-severity first.
 3. **Calibrate** — per op, a decided generative-vs-deterministic split, composite mode, mask, feather, and rationale. A pure policy of defect, severity, face size, resolution, identity sensitivity.
 4. **Verdict** — a native-resolution self-audit whose coverage equals the map. Ships only clean regions; escalates or refuses the rest.
 
 ```bash
-# Offline, no API, no cost (mock generator + assessor):
-retoucher INPUT --engine v3 --dry-run --out-dir out
-
-# Real run (Gemini proposer; reads ~/Desktop/gemini.txt or $GEMINI_API_KEY):
-retoucher INPUT --engine v3 --samples 3 --out-dir out
+retoucher INPUT --engine v3 --dry-run --out-dir out    # offline (mock generator + assessor)
+retoucher INPUT --engine v3 --samples 3 --out-dir out  # real run (Gemini)
 ```
 
-v3 writes a per-image telemetry report and the output image only when delivered (audit-gated; it will not ship the least-bad). Run locally, not in a sandboxed environment (it denies the GPU and MediaPipe aborts).
+v3 writes a per-image telemetry report and the output image only when delivered (audit-gated; it will not ship the least-bad; `--force` writes a flagged image for inspection). **Status: experimental on real photos** — it is proven on the synthetic test suite, but its one real-photo run over-edited (many small auto-composites) and was correctly caught by its own audit; unattended delivery is not yet trusted. Use the surgical engine for real work. Run locally, not in a sandboxed environment (it denies the GPU and MediaPipe aborts).
 
 ---
 

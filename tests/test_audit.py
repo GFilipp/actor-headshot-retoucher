@@ -145,6 +145,31 @@ def test_identity_is_required_never_skipped():
     assert diff["status"] in ("pass", "fail") and diff["status"] != "skipped"
 
 
+def test_audit_map_precompute_equivalence_and_conversion_count(monkeypatch):
+    # The precompute is PURE speedup: audit_map verdicts must be identical to standalone
+    # per-region calls, and rgb2lab must run once per image, not once per region.
+    hard = BASE.copy()
+    m = REGION > 0.5
+    hard[m] = np.clip(hard[m] + 0.15, 0, 1)
+    regions = [{"op_id": "a", "mask": REGION, "skin_ref": REF},
+               {"op_id": "b", "mask": _disc(200, 200, 30), "skin_ref": REF}]
+    vm = audit_map(BASE, hard, regions)
+    vs = [audit_region(BASE, hard, r["mask"], op_id=r["op_id"], skin_ref=r["skin_ref"])
+          for r in regions]
+    assert [v.to_dict() for v in vm] == [v.to_dict() for v in vs]
+
+    calls = {"n": 0}
+    real = audit.rgb2lab
+
+    def counting(x):
+        calls["n"] += 1
+        return real(x)
+
+    monkeypatch.setattr(audit, "rgb2lab", counting)
+    audit.audit_map(BASE, hard, regions)
+    assert calls["n"] == 2                     # once per image, regardless of region count
+
+
 def test_score_and_all_clean_gate_delivery():
     clean = audit_region(BASE, _feathered(BASE, 0.05), REGION, skin_ref=REF)
     hard = BASE.copy(); hard[REGION > 0.5] = np.clip(hard[REGION > 0.5] + 0.15, 0, 1)

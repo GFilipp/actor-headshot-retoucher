@@ -3,6 +3,44 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v3.1.0
+
+A fresh-eyes QA sweep (three independent reviewers over code, docs, and repo hygiene)
+plus the memorialization of the workflow that actually delivered real photos.
+
+New — the surgical engine (`--engine surgical`):
+- `retoucher/surgical.py`: the proven one-region recipe as a tested, runnable path —
+  Gemini donor -> register to the original -> LAB color-match to clean face skin ->
+  composite ONE organic region (paste/luma/transfer, features protected after feathering)
+  -> light polish -> native-resolution audit of the region as a CHECK (operator judges).
+  Draws K donors and keeps the audit-cleanest. Graceful refusal without a frontal face.
+- CLI: `--region`, `--composite`, `--whites/--discolor/--lines`; always writes the image
+  (suffix `surgical`) + a telemetry report. Defaults are the recipe that delivered the
+  20260509 shoot.
+
+Fixes:
+- VLM bbox sanitization (the ghost-blob bug): normalized 0-1 boxes are scaled, everything
+  is clamped to the frame, degenerate boxes are dropped AND flagged in `out_of_scope`; the
+  VLM prompt now requests fractional coords. A mask is never built from a bogus box.
+- `--max-process-mp` now reaches the v3 engine (was silently ignored on that path).
+- Audit perf: per-image arrays (gray/LAB/edit-delta gradient/Laplacians) are computed once
+  per (original, retouched) pair and shared across regions — was O(regions x full-image),
+  ~13 minutes on a real 26-region map; equivalence-tested (identical verdicts).
+- Analyze: when the VLM reports 0 faces but CV geometry found one, CV wins and the
+  disagreement is recorded (was silently stored as face_count=0).
+- CLI errors now print exception type + traceback; dropped an unused parameter from
+  `build_edit_prompt`.
+
+Docs truth-pass:
+- README/SKILL/METHODOLOGY now say what is true: the surgical engine is the recommended
+  real-photo path; v3 automation is experimental (its one real-photo run over-edited and
+  was correctly caught by its own audit); the RetouchMap is sorted highest-severity first
+  (the "identity-safe first" claim contradicted the code); the CLI default remains `v2`.
+- METHODOLOGY gains "The surgical session" (the recipe, mode selection, knobs).
+- `references/retouch_workflows.md` is explicitly marked legacy-v2 and SKILL points at
+  METHODOLOGY for current workflow.
+- `.gitignore` covers `*.report.json` and `out*/`.
+
 ## v3.0.1
 
 Hardening + cleanup after running v3 on a real photo (it over-flagged because the audit
