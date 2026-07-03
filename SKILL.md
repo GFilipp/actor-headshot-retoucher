@@ -15,26 +15,28 @@ Preserve identity, expression, face/body structure, pose, hair character, stubbl
 
 The standard is: rested, healthy, polished, high-end, natural, and unmistakably real.
 
-## v3 Engine (default approach)
+## Engines: surgical (recommended) and v3 (experimental automation)
 
-The system of record is [`METHODOLOGY.md`](METHODOLOGY.md); the pre-delivery checklist is [`RULES.md`](RULES.md); the failure log is [`references/retouch_learnings.md`](references/retouch_learnings.md). Read them before changing behavior.
+The system of record is [`METHODOLOGY.md`](METHODOLOGY.md); the pre-delivery checklist is [`RULES.md`](RULES.md); the failure log is [`references/retouch_learnings.md`](references/retouch_learnings.md). Read them before changing behavior. Note the CLI's `--engine` default is `v2` (backward compatibility); pick an engine explicitly.
 
-The v3 engine is dynamic, holistic, and calibrated per photo. It runs four typed contracts that survive into a JSON telemetry report:
-
-1. **Analyze** — assess the whole picture (shot type, face size, resolution, lighting, subjects across face and hands, neck, chest, hair) and build a defect map. VLM proposes, local CV corroborates. Unhandleable photos (multi-person, profile, heavy occlusion) are flagged, never crashed.
-2. **RetouchMap** — ordered ops across every in-scope region, identity-safe first.
-3. **Calibrate** — per op, decide the generative-vs-deterministic split, composite mode, mask, feather, and rationale. Small or low-resolution faces never get a raw paste; pigment is generative-led; mild unevenness is deterministic only; hair is generative only.
-4. **Verdict** — a self-audit at nearest-neighbor native resolution whose coverage equals the map. Deliver only clean regions; escalate or refuse the rest. Identity is required, not skipped.
+**Surgical (`--engine surgical`) — use this for real photos.** The proven recipe: a Gemini donor is regenerated, registered to the original, color-matched to clean face skin, composited into ONE organic region (paste/luma/transfer, features protected after feathering), lightly polished, and the region is audited at native resolution as a check. Draw K donors, keep the cleanest; the operator judges the image.
 
 ```bash
-# Offline (no API, no cost):
-python -m retoucher INPUT --engine v3 --dry-run --out-dir out
-
-# Real run (Gemini proposer; key at ~/Desktop/gemini.txt or $GEMINI_API_KEY):
-python -m retoucher INPUT --engine v3 --samples 3 --out-dir out
+# Real run (Gemini donor; key at ~/Desktop/gemini.txt or $GEMINI_API_KEY):
+python -m retoucher INPUT --engine surgical --samples 2 --out-dir out
+# knobs: --region periorbital|under_eye|face  --composite paste|luma|transfer  --whites/--discolor/--lines
 ```
 
-Non-negotiable: audit at native resolution (never an interpolated preview), audit coverage equals map coverage, delivery is audit-gated (refuse rather than ship least-bad), and run locally (a sandboxed environment denies the GPU and MediaPipe aborts). The Mode Decision and Deterministic Transfer sections below are the legacy v2 pipeline (`--engine v2`), kept for backward compatibility.
+**v3 (`--engine v3`) — experimental whole-photo automation.** Four typed contracts that survive into a JSON telemetry report:
+
+1. **Analyze** — assess the whole picture (shot type, face size, resolution, lighting, subjects across face and hands, neck, chest, hair) and build a defect map. VLM proposes, local CV corroborates. Unhandleable photos (multi-person, profile, heavy occlusion) are flagged, never crashed.
+2. **RetouchMap** — ordered ops across every in-scope region, highest-severity first.
+3. **Calibrate** — per op, decide the generative-vs-deterministic split, composite mode, mask, feather, and rationale. Small or low-resolution faces never get a raw paste; pigment is generative-led; mild unevenness is deterministic only; hair is generative only. Identity-sensitive ops get a capped generative share.
+4. **Verdict** — a self-audit at nearest-neighbor native resolution whose coverage equals the map. Deliver only clean regions; escalate or refuse the rest. Identity is required, not skipped.
+
+Status: proven on the synthetic test suite; its one real-photo run over-edited (many small auto-composites) and was correctly caught by its own audit. Do not use it unattended for delivery yet — use the surgical engine.
+
+Non-negotiable across engines: audit at native resolution (never an interpolated preview), audit coverage equals map coverage, v3 delivery is audit-gated (refuse rather than ship least-bad), and run locally (a sandboxed environment denies the GPU and MediaPipe aborts). The Mode Decision and Deterministic Transfer sections below are the legacy v2 pipeline (`--engine v2`), kept for backward compatibility.
 
 ## Mandatory Readiness Gate
 
@@ -102,7 +104,7 @@ Minimum board:
 - Hairline and distracting flyaways
 - Wardrobe texture and background integrity
 
-For the detailed workflow, read `references/retouch_workflows.md` before retouching.
+For the surgical/v3 workflow, read `METHODOLOGY.md` before retouching; `references/retouch_workflows.md` covers only the legacy v2 modes.
 
 ## Pipeline Discipline
 
