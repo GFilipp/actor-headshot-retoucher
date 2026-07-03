@@ -17,6 +17,7 @@ import importlib.util
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 
 from .config import PipelineConfig
@@ -142,15 +143,21 @@ def _run_v3(source: Path, out_dir: Path, args) -> int:
     # A real run uses the VLM assessor so the WHOLE photo is inventoried (hands/neck/chest/
     # hair), not just the face-derived CV inventory. --dry-run stays fully offline (Mock).
     assessor = None if args.dry_run else GeminiVisionAssessor()
-    jpeg_q = PipelineConfig().jpeg_quality
+    cfg = PipelineConfig()
+    if args.max_process_mp is not None:
+        if args.max_process_mp <= 0:
+            print("--max-process-mp must be greater than 0", file=sys.stderr)
+            return 1
+        cfg.max_process_mp = args.max_process_mp
     reports, rc = [], 0
     for p in paths:
         try:
             img = load(p)
-            res = retouch(img.pixels, generator=generator, assessor=assessor,
+            res = retouch(img.pixels, generator=generator, assessor=assessor, pipe_cfg=cfg,
                           samples=max(1, args.samples), max_escalate=max(0, args.max_escalate))
         except Exception as exc:
-            print(f"{p.name}: ERROR {exc}", file=sys.stderr)
+            print(f"{p.name}: ERROR {type(exc).__name__}: {exc}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             rc = 1
             continue
         reports.append(res.report)
@@ -173,7 +180,7 @@ def _run_v3(source: Path, out_dir: Path, args) -> int:
             if res.delivered or args.force:
                 suffix = "v3" if res.delivered else "v3-flagged"
                 outp = save_versioned(res.image, out_dir, p.stem, suffix=suffix,
-                                      icc=img.icc, exif=img.exif, quality=jpeg_q)
+                                      icc=img.icc, exif=img.exif, quality=cfg.jpeg_quality)
                 if not args.json:
                     print(f"    output: {outp}")
             if not args.json:

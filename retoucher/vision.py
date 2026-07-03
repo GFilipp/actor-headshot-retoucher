@@ -70,6 +70,9 @@ _VLM_PROMPT = (
     '"face_count":N,"defects":[{"region":"face|eye_area|neck|chest|hands|hair",'
     '"defect":"under_eye|crepe|pigmentation|discoloration|blemish|skin_unevenness|'
     'eye_white_cast|flyaway","severity":0.0-1.0,"bbox":[x0,y0,x1,y1]}]}. '
+    "bbox values MUST be fractions of image width/height in 0.0-1.0 (x0,y0 = top-left, "
+    "x1,y1 = bottom-right), NOT pixels — pixel coords at a guessed resolution put masks "
+    "in the wrong place. "
     "Inventory EVERY region incl. hands/neck/chest/stray hairs. Identity must be "
     "preserved; flag only temporary/cosmetic defects, never bone structure or features."
 )

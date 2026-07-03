@@ -54,3 +54,32 @@ def test_analyze_out_of_scope_region_flagged_not_mapped():
     a, m, geom = analyze(make_original(), assessor=stub, geom=fake_geometry())
     assert "background" in a.out_of_scope
     assert all(o.region != "background" for o in m.ops)     # not silently treated
+
+
+def test_vlm_bboxes_sanitized_scaled_clamped_or_dropped():
+    # The ghost-blob bug: VLM boxes must never build a mask in the wrong place.
+    img = make_original()
+    h, w = img.shape[:2]
+    stub = _StubAssessor({"shot_type": "headshot", "lighting": "soft", "face_count": 1,
+                          "defects": [
+                              {"region": "face", "defect": "blemish", "severity": 0.9,
+                               "bbox": [0.25, 0.25, 0.5, 0.5]},          # normalized 0-1
+                              {"region": "face", "defect": "blemish", "severity": 0.8,
+                               "bbox": [-50, -50, 99999, 99999]},        # out of bounds
+                              {"region": "hands", "defect": "pigmentation", "severity": 0.7,
+                               "bbox": [10, 10, 10, 10]},                # degenerate
+                          ]})
+    a, m, geom = analyze(img, assessor=stub, geom=fake_geometry())
+    by_id = {o.op_id: o for o in m.ops}
+    assert by_id["op0"].bbox == (int(0.25 * w), int(0.25 * h), int(0.5 * w), int(0.5 * h))
+    assert by_id["op1"].bbox == (0, 0, w - 1, h - 1)
+    assert "op2" not in by_id                                # dropped, not silently masked
+    assert "hands: invalid bbox" in a.out_of_scope           # ...and flagged
+
+
+def test_vlm_zero_faces_cv_geometry_wins_with_recorded_disagreement():
+    stub = _StubAssessor({"shot_type": "headshot", "lighting": "soft",
+                          "face_count": 0, "defects": []})
+    a, m, geom = analyze(make_original(), assessor=stub, geom=fake_geometry())
+    assert a.handleable is True and a.face_count == 1        # masks come from CV geometry
+    assert "CV wins" in a.reason                             # conflict recorded, not silent

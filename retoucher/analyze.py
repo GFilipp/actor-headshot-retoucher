@@ -27,6 +27,32 @@ def _bbox(mask: np.ndarray) -> tuple[int, int, int, int]:
     return (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max()))
 
 
+def _sanitize_bbox(raw, w: int, h: int) -> tuple[int, int, int, int] | None:
+    """Make a VLM-reported bbox safe to build a mask from. VLMs variously return pixel
+    coords (sometimes for a different resolution than ours) or normalized 0-1 fractions;
+    unvalidated coords put masks in the wrong place (the ghost-blob bug). Normalized
+    values are scaled to the working frame, everything is clamped to the frame, and a
+    box that is degenerate after clamping returns None (the caller drops + flags it)."""
+    try:
+        vals = [float(v) for v in raw]
+    except (TypeError, ValueError):
+        return None
+    if len(vals) != 4:
+        return None
+    if all(0.0 <= v <= 1.5 for v in vals):        # normalized 0-1 (tolerate slight overshoot)
+        vals = [vals[0] * w, vals[1] * h, vals[2] * w, vals[3] * h]
+    x0, y0, x1, y1 = vals
+    if x1 < x0:
+        x0, x1 = x1, x0
+    if y1 < y0:
+        y0, y1 = y1, y0
+    x0 = int(np.clip(x0, 0, w - 1)); x1 = int(np.clip(x1, 0, w - 1))
+    y0 = int(np.clip(y0, 0, h - 1)); y1 = int(np.clip(y1, 0, h - 1))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return (x0, y0, x1, y1)
+
+
 def analyze(
     rgb: np.ndarray,
     assessor: VisionAssessor | None = None,
@@ -52,6 +78,11 @@ def analyze(
     a = assessor.assess(rgb)
     vlm_faces = int(a.get("face_count", 1 if geom is not None else 0))
     lighting = str(a.get("lighting", "unknown"))
+    # CV geometry is what the masks are built from, so it wins a face-count disagreement:
+    # record the conflict instead of silently proceeding with face_count=0.
+    cv_vlm_disagree = geom is not None and vlm_faces == 0
+    if cv_vlm_disagree:
+        vlm_faces = 1
 
     if face_w_frac >= HEADSHOT_WIDTH_FRAC:
         shot = "headshot"
@@ -71,7 +102,9 @@ def analyze(
         handleable, reason = False, f"{vlm_faces} faces — multi-person not in scope"
         out_of_scope.append("multi-person")
     else:
-        handleable, reason = True, ""
+        handleable = True
+        reason = ("VLM reported 0 faces; CV geometry found one (CV wins)"
+                  if cv_vlm_disagree else "")
 
     subjects: list[Subject] = []
     skin_refs: dict[str, tuple[int, int, int, int]] = {}
@@ -83,11 +116,17 @@ def analyze(
     for i, d in enumerate(a.get("defects", [])):
         region = str(d.get("region", "face"))
         defect = str(d.get("defect", "blemish"))
-        bbox = tuple(int(v) for v in d.get("bbox", (0, 0, 0, 0)))  # type: ignore[assignment]
         sev = float(d.get("severity", 0.5))
         if region not in IN_SCOPE_REGIONS:
             if region not in out_of_scope:
                 out_of_scope.append(region)
+            continue
+        bbox = _sanitize_bbox(d.get("bbox", (0, 0, 0, 0)), w, h)
+        if bbox is None:
+            # Never build a mask from a bogus box (the ghost-blob bug) — drop + flag.
+            flag = f"{region}: invalid bbox"
+            if flag not in out_of_scope:
+                out_of_scope.append(flag)
             continue
         ops.append(RetouchOp(op_id=f"op{i}", region=region, defect=defect,
                              severity=sev, bbox=bbox, source="both"))

@@ -172,7 +172,7 @@ def retouch(
     need_gen = any(r.gen_weight > 0 for r in calibs)
     raw_donors = [None]
     if need_gen and generator is not None:
-        prompt = build_edit_prompt(assessment, rmap)
+        prompt = build_edit_prompt(rmap)
         report["prompt"] = prompt
         raw_donors = edit_n(generator, rgb, prompt, n=max(1, samples))
     # A donor much lower-res than the working image injects upscaling stipple wherever it is
