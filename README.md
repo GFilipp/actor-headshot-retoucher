@@ -162,11 +162,13 @@ It falls back to a known model only if the models API is unreachable. The genera
 This is both a runnable Python package and a Claude Code / agent skill.
 
 ```
-actor-headshot-retouch-skill/   (clone this; the repo itself is the skill)
+actor-headshot-retoucher/   (clone this; the repo root is also the skill)
 ├── SKILL.md            agent behaviour spec
-├── retoucher/          the pipeline (align, diff, mask, blend, qa, cli)
+├── METHODOLOGY.md      the system of record (surgical + v3, with the recipe)
+├── RULES.md            pre-delivery checklist
+├── retoucher/          the package (surgical, orchestrator, analyze, calibrate, audit, ...)
 ├── scripts/            check_readiness.py preflight
-├── references/         retouch standards and prompts
+├── references/         retouch standards, prompts, learnings
 ├── tests/              offline test suite (mock generator)
 ├── examples/           reproducible demo + retouch-map illustration
 ├── pyproject.toml
