@@ -83,3 +83,13 @@ def test_vlm_zero_faces_cv_geometry_wins_with_recorded_disagreement():
     a, m, geom = analyze(make_original(), assessor=stub, geom=fake_geometry())
     assert a.handleable is True and a.face_count == 1        # masks come from CV geometry
     assert "CV wins" in a.reason                             # conflict recorded, not silent
+
+
+def test_vlm_parse_failure_refuses_not_delivers():
+    # face_count=-1 is the assessor's parse-failure sentinel; it must NOT be treated as a
+    # clean "nothing to fix" (which would deliver an untouched original as success).
+    stub = _StubAssessor({"shot_type": "unknown", "lighting": "unknown",
+                          "face_count": -1, "defects": []})
+    a, m, geom = analyze(make_original(), assessor=stub, geom=fake_geometry())
+    assert a.handleable is False
+    assert "assessment-failed" in a.out_of_scope and "failed to parse" in a.reason

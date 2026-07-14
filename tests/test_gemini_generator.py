@@ -38,3 +38,18 @@ def test_edit_n_draws_n_candidates():
 
     out = edit_n(MockGenerator(transform=t), np.zeros((8, 8, 3), np.float32), "prompt", 3)
     assert len(out) == 3 and calls["n"] == 3
+
+
+def test_edit_n_resilient_to_a_failed_sample():
+    # One sample raising (transient API error) must not discard the good donors.
+    calls = {"n": 0}
+
+    def flaky(img):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("transient generator failure")
+        return img
+
+    out = edit_n(MockGenerator(transform=flaky), np.zeros((8, 8, 3), np.float32), "prompt", 3)
+    assert len(out) == 3
+    assert out[0] is not None and out[2] is not None and out[1] is None

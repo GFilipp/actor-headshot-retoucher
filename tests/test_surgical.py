@@ -67,6 +67,26 @@ def test_surgical_refuses_gracefully_without_a_face():
     assert np.allclose(res.image, blank)                    # original handed back untouched
 
 
+def test_surgical_mismatched_geom_shape_is_rejected_not_crashed():
+    # A caller-supplied geom whose mask shape != the (possibly resized) image must be
+    # discarded and re-detected, never used to build masks against the wrong shape.
+    geom = fake_geometry()
+    h, w = geom.face_oval.shape[:2]
+    bigger = np.full((h + 40, w + 40, 3), 0.5, np.float32)
+    res = surgical_retouch(bigger, generator=MockGenerator(), geom=geom, samples=1)
+    # geom discarded -> re-detect -> no face on a blank -> graceful refusal, no crash
+    assert res.handleable is False
+
+
+def test_surgical_downgrades_lowres_donor_paste_to_transfer():
+    rgb = make_original()
+    geom = fake_geometry()
+    tiny = lambda img: np.full((20, 20, 3), 0.5, np.float32)   # donor far smaller than frame
+    res = surgical_retouch(rgb, generator=MockGenerator(transform=tiny), geom=geom,
+                           mode="paste", samples=1)
+    assert res.report["registrations"][0]["mode"] == "transfer"  # blur guard kicked in
+
+
 def test_cli_surgical_dry_run_writes_report(tmp_path):
     src = tmp_path / "head.png"
     Image.fromarray(to_uint8(make_original())).save(src)

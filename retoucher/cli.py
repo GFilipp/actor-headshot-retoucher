@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import os
 import sys
 import traceback
@@ -158,7 +159,7 @@ def _run_v3(source: Path, out_dir: Path, args) -> int:
     assessor = None if args.dry_run else GeminiVisionAssessor()
     cfg = PipelineConfig()
     if args.max_process_mp is not None:
-        if args.max_process_mp <= 0:
+        if not math.isfinite(args.max_process_mp) or args.max_process_mp <= 0:
             print("--max-process-mp must be greater than 0", file=sys.stderr)
             return 1
         cfg.max_process_mp = args.max_process_mp
@@ -219,18 +220,19 @@ def _run_surgical(source: Path, out_dir: Path, args) -> int:
     generator = get_generator("mock" if args.dry_run else "gemini")
     cfg = PipelineConfig()
     if args.max_process_mp is not None:
-        if args.max_process_mp <= 0:
+        if not math.isfinite(args.max_process_mp) or args.max_process_mp <= 0:
             print("--max-process-mp must be greater than 0", file=sys.stderr)
             return 1
         cfg.max_process_mp = args.max_process_mp
     reports, rc = [], 0
+    clamp01 = lambda v: min(1.0, max(0.0, v)) if math.isfinite(v) else 0.0
     for p in paths:
         try:
             img = load(p)
             res = surgical_retouch(
                 img.pixels, generator=generator, region=args.region, mode=args.composite,
-                samples=max(1, args.samples), whites=args.whites, discolor=args.discolor,
-                lines=args.lines, pipe_cfg=cfg)
+                samples=max(1, args.samples), whites=clamp01(args.whites),
+                discolor=clamp01(args.discolor), lines=clamp01(args.lines), pipe_cfg=cfg)
         except Exception as exc:
             print(f"{p.name}: ERROR {type(exc).__name__}: {exc}", file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
@@ -292,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         cfg.generator_max_mp = args.max_mp
     if args.max_process_mp is not None:
-        if args.max_process_mp <= 0:
+        if not math.isfinite(args.max_process_mp) or args.max_process_mp <= 0:
             print("--max-process-mp must be greater than 0", file=sys.stderr)
             return 1
         cfg.max_process_mp = args.max_process_mp
