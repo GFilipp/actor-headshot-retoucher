@@ -240,10 +240,20 @@ class GeminiGenerator:
         raise RuntimeError(f"Gemini produced no image. Last: {last}")
 
 
-def edit_n(generator: Generator, image_rgb: np.ndarray, prompt: str, n: int = 1) -> list[np.ndarray]:
+def edit_n(generator: Generator, image_rgb: np.ndarray, prompt: str, n: int = 1) -> list[np.ndarray | None]:
     """Draw ``n`` candidates from a generator. Gemini is stochastic and some samples
-    carry artifacts (stipple) — sample, then let the self-audit pick the cleanest."""
-    return [generator.edit(image_rgb, prompt) for _ in range(max(1, int(n)))]
+    carry artifacts (stipple) — sample, then let the self-audit pick the cleanest.
+
+    Resilient per draw: a sample that raises (transient API error, etc.) yields ``None``
+    rather than discarding the other good donors. Callers filter ``None`` and refuse
+    gracefully if every draw failed."""
+    out: list[np.ndarray | None] = []
+    for _ in range(max(1, int(n))):
+        try:
+            out.append(generator.edit(image_rgb, prompt))
+        except Exception:
+            out.append(None)
+    return out
 
 
 def get_generator(name: str = "openai", **kwargs) -> Generator:

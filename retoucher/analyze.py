@@ -78,6 +78,9 @@ def analyze(
     a = assessor.assess(rgb)
     vlm_faces = int(a.get("face_count", 1 if geom is not None else 0))
     lighting = str(a.get("lighting", "unknown"))
+    # A negative face_count is the assessor's parse-failure sentinel (see GeminiVisionAssessor):
+    # NOT a clean "nothing to fix" — we simply have no trustworthy inventory, so refuse below.
+    parse_failed = vlm_faces < 0
     # CV geometry is what the masks are built from, so it wins a face-count disagreement:
     # record the conflict instead of silently proceeding with face_count=0.
     cv_vlm_disagree = geom is not None and vlm_faces == 0
@@ -98,6 +101,9 @@ def analyze(
     if geom is None:
         handleable, reason = False, "no clear frontal face detected"
         out_of_scope.append("no-face/occluded/profile")
+    elif parse_failed:
+        handleable, reason = False, "assessment failed to parse (VLM returned no usable inventory)"
+        out_of_scope.append("assessment-failed")
     elif vlm_faces > 1:
         handleable, reason = False, f"{vlm_faces} faces — multi-person not in scope"
         out_of_scope.append("multi-person")

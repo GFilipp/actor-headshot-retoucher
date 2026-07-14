@@ -49,7 +49,7 @@ def surgical_retouch(
 ) -> SurgicalResult:
     """Run the surgical recipe on one photo. Returns the retouched image, the region's
     native-resolution audit verdict (informational — the operator decides), and a
-    telemetry report. Refuses gracefully (original image back) when no frontal face."""
+    telemetry report. Refuses gracefully (returns the working image) when no frontal face."""
     if region not in REGIONS:
         raise ValueError(f"region must be one of {REGIONS}, got {region!r}")
     if mode not in MODES:
@@ -58,6 +58,10 @@ def surgical_retouch(
     rgb = rgb.astype(np.float32)
     if pipe_cfg.max_process_mp:
         rgb, _ = resize_to_megapixels(rgb, pipe_cfg.max_process_mp)
+    # A caller-supplied geom computed on the pre-cap image would mismatch the resized frame
+    # (masks at the wrong shape -> crash). Trust it only if it matches; else (re)detect.
+    if geom is not None and geom.face_oval.shape[:2] != rgb.shape[:2]:
+        geom = None
     if geom is None:
         geom = faceparse.detect(rgb)
 
@@ -71,6 +75,7 @@ def surgical_retouch(
     region_mask = np.clip(build_region(geom, region, grow=grow), 0, 1)
     skin_ref = _clean_skin_ref(geom, region_mask, rgb.shape[:2], is_face=True)
     donors = edit_n(generator, rgb, prompt or SURGICAL_UNDER_EYE, n=max(1, samples))
+    work_long = max(rgb.shape[:2])
 
     candidates: list[tuple[float, int, np.ndarray, RegionVerdict]] = []
     registrations: list[dict] = []
@@ -78,10 +83,14 @@ def surgical_retouch(
         if donor is None:
             registrations.append({"index": i, "method": "none", "score": 0.0})
             continue
+        # A donor much smaller than the working frame (Gemini caps at ~1536px) would upscale
+        # into a blurry/stippled paste — keep the original texture via transfer instead.
+        eff_mode = "transfer" if (mode == "paste" and max(donor.shape[:2]) < 0.6 * work_long) else mode
         aligned, method, reg_score = register_donor(rgb, donor)
-        registrations.append({"index": i, "method": method, "score": round(float(reg_score), 3)})
-        aligned = color_match(aligned, rgb, geom.face_oval)   # kill donor rouge before compositing
-        out = composite_region(rgb, aligned, region_mask, mode=mode, strength=1.0,
+        registrations.append({"index": i, "method": method, "score": round(float(reg_score), 3),
+                             "mode": eff_mode})
+        aligned = color_match(aligned, rgb, skin_ref)         # match CLEAN skin, not the defect area
+        out = composite_region(rgb, aligned, region_mask, mode=eff_mode, strength=1.0,
                                feather=feather, protect=geom.protect)
         out = polish_eyes(out, geom, whites=whites, discolor=discolor, lines=lines)
         verdict = audit_region(rgb, out, region_mask, op_id=f"surgical:{region}",
@@ -93,7 +102,10 @@ def surgical_retouch(
         report.update({"handleable": False, "reason": "generator returned no usable donor"})
         return SurgicalResult(rgb, handleable=False, report=report)
 
-    candidates.sort(key=lambda t: -t[0])
+    # Best score wins; ties break toward a clean verdict, then fewer failed gates.
+    def _fails(v):
+        return sum(1 for g in v.gates if g["status"] == "fail")
+    candidates.sort(key=lambda t: (-t[0], not t[3].clean, _fails(t[3])))
     best_score, sel, image, verdict = candidates[0]
     report.update({
         "handleable": True, "selected": sel,

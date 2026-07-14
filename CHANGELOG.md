@@ -3,6 +3,30 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v3.1.1
+
+Remediation of an adversarial Codex review of v3.1.0. The highest-risk change (the
+`audit._Pre` precompute) was confirmed numerically equivalent; these are robustness and
+correctness hardening fixes.
+
+- **analyze.py:** a VLM parse failure (assessor's `face_count = -1` sentinel) is now a
+  refusal, not a clean delivery — an empty defect map from a failed assessment no longer
+  reports DELIVERED on an untouched original.
+- **generate.py `edit_n`:** resilient per draw — a sample that raises yields `None` instead
+  of discarding the other good donors; callers refuse gracefully only if every draw failed.
+- **surgical.py:** a caller-supplied geometry whose shape doesn't match the (resized)
+  working image is re-detected instead of crashing during compositing; color-match now
+  targets the clean-skin reference (not the whole face oval, which included the defect);
+  a donor much smaller than the working frame downgrades `paste` -> `transfer` (mirrors v3's
+  low-res guard) to avoid upscale blur; donor tie-breaks prefer a clean verdict then fewer
+  fails.
+- **cli.py:** `--max-process-mp` rejects non-finite values (NaN slipped past `<= 0`);
+  surgical polish strengths (`--whites/--discolor/--lines`) are clamped to `[0, 1]`.
+- Docs: surgical refusal docstring corrected (returns the working image); the v3.1.0
+  traceback claim scoped to the v3/surgical paths (v2 unchanged).
+
+107 tests pass (5 new).
+
 ## v3.1.0
 
 A fresh-eyes QA sweep (three independent reviewers over code, docs, and repo hygiene)
@@ -28,8 +52,8 @@ Fixes:
   ~13 minutes on a real 26-region map; equivalence-tested (identical verdicts).
 - Analyze: when the VLM reports 0 faces but CV geometry found one, CV wins and the
   disagreement is recorded (was silently stored as face_count=0).
-- CLI errors now print exception type + traceback; dropped an unused parameter from
-  `build_edit_prompt`.
+- The v3/surgical CLI error paths now print exception type + traceback (the legacy v2
+  path is unchanged); dropped an unused parameter from `build_edit_prompt`.
 
 Docs truth-pass:
 - README/SKILL/METHODOLOGY now say what is true: the surgical engine is the recommended
