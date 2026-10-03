@@ -165,12 +165,14 @@ class OpenAIGenerator:
 
 # Google Gemini image models, newest-first. The Generative Language *auth* keys
 # (AQ.* prefix) block models.list, so we try known ids in order rather than discover.
-FALLBACK_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+# Hand-maintained: refresh when Google's deprecation table changes
+# (https://ai.google.dev/gemini-api/docs/deprecations; last checked 2026-10-02).
+# Remove shut-down ids; one left at the tail 404s and replaces the real error that
+# edit() reports as "Last:".
+FALLBACK_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image"
 GEMINI_IMAGE_MODELS = [
-    "gemini-2.5-flash-image",
-    "gemini-2.5-flash-image-preview",
-    "gemini-2.0-flash-preview-image-generation",
-    "gemini-2.0-flash-exp-image-generation",
+    "gemini-3.1-flash-image",
+    "gemini-3-pro-image",
 ]
 DEFAULT_GEMINI_KEY_FILE = "~/Desktop/gemini.txt"
 
