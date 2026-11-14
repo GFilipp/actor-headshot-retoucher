@@ -6,5 +6,6 @@ opencv-contrib-python-headless>=4.8   # base + ximgproc (guided filter)
 scikit-image>=0.21
 mediapipe>=0.10                       # face geometry: feature protection + under-eye
 
-# Optional generator backend (only for real OpenAI runs; --dry-run needs none):
-# openai>=1.0
+# Optional generator backends (--dry-run needs neither):
+# google-genai>=2.8                   # Gemini: the surgical engine's real runs
+# openai>=1.0                         # OpenAI: --backend openai

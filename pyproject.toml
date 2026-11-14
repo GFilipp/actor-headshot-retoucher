@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "actor-headshot-retoucher"
-version = "3.1.1"
+version = "3.1.2"
 description = "Dynamic, holistic, hybrid actor-retouch system: analyze, calibrate, surgically composite, and self-audit per photo (identity-preserving, casting-grade)."
 # Pinned to 3.12: MediaPipe (required for feature protection) ships wheels here;
 # 3.14 has no MediaPipe wheels yet.
@@ -26,6 +26,7 @@ advanced = [
     "lpips>=0.1",            # perceptual untouched-region gate
     "rawpy>=0.19",           # RAW input
 ]
+gemini = ["google-genai>=2.8"]   # Gemini donor: the surgical engine's real runs
 openai = ["openai>=1.0"]
 dev = ["pytest>=7.0"]
 

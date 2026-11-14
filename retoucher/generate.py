@@ -16,6 +16,7 @@ from typing import Callable, Protocol
 import numpy as np
 from PIL import Image
 
+from ._retry import call_with_backoff
 from .image_io import to_float, to_uint8
 
 
@@ -174,6 +175,7 @@ GEMINI_IMAGE_MODELS = [
     "gemini-3.1-flash-image",
     "gemini-3-pro-image",
 ]
+# Key-file fallback lives OUTSIDE the repo; a key never goes inside it or into a commit.
 DEFAULT_GEMINI_KEY_FILE = "~/Desktop/gemini.txt"
 
 
@@ -229,7 +231,9 @@ class GeminiGenerator:
         for m in models:
             for cfg in configs:
                 try:
-                    resp = client.models.generate_content(model=m, contents=[prompt, img], config=cfg)
+                    resp = call_with_backoff(
+                        lambda m=m, cfg=cfg: client.models.generate_content(
+                            model=m, contents=[prompt, img], config=cfg))
                     for cand in getattr(resp, "candidates", None) or []:
                         for part in getattr(getattr(cand, "content", None), "parts", None) or []:
                             inl = getattr(part, "inline_data", None)

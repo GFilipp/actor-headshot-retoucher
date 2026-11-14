@@ -102,6 +102,13 @@ Optional heavier gates (identity check, perceptual check, RAW input):
 python -m pip install ".[advanced]"
 ```
 
+For real surgical runs (Gemini donor), add the Gemini SDK and set a key:
+
+```bash
+python -m pip install ".[gemini]"
+export GEMINI_API_KEY=...   # or keep it in ~/Desktop/gemini.txt; never inside the repo
+```
+
 For real runs against OpenAI, add the SDK and set a key:
 
 ```bash
@@ -163,6 +170,7 @@ This is both a runnable Python package and a Claude Code / agent skill.
 
 ```
 actor-headshot-retoucher/   (clone this; the repo root is also the skill)
+├── AGENTS.md           start here for AI agents (CLAUDE.md loads it for Claude Code)
 ├── SKILL.md            agent behaviour spec
 ├── METHODOLOGY.md      the system of record (surgical + v3, with the recipe)
 ├── RULES.md            pre-delivery checklist

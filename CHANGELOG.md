@@ -3,6 +3,24 @@
 Versions follow the GitHub releases. The package version (`pyproject.toml`) is
 the single source of truth.
 
+## v3.1.2
+
+Hand-off release: a new AI agent (Claude Code or Codex) can set up, run and test the
+project from the repo alone.
+
+- **Agent entry docs:** `AGENTS.md` (read by Codex and other agents) holds setup, run,
+  test and the project rules on one page; `CLAUDE.md` loads it for Claude Code.
+- **Install:** new `gemini` extra (`pip install ".[gemini]"`) declares the Gemini SDK the
+  surgical engine's real runs need. Before, a fresh clone only found out at run time.
+- **Gemini image models (generate.py):** shut-down IDs replaced with
+  `gemini-3.1-flash-image` and `gemini-3-pro-image` (Google's deprecation table, checked
+  2026-10-02). The list is hand-maintained because the key type blocks model listing.
+- **Retry with backoff (new `retoucher/_retry.py`):** Gemini image and vision calls retry
+  transient errors (HTTP 429 / 5xx) with exponential backoff; any other error propagates
+  unchanged.
+- **Secrets:** `.gitignore` also blocks `.secrets/`, `*.key` and `gemini.txt`. The key
+  stays outside the repo: `$GEMINI_API_KEY`, else `~/Desktop/gemini.txt`.
+
 ## v3.1.1
 
 Remediation of an adversarial Codex review of v3.1.0. The highest-risk change (the

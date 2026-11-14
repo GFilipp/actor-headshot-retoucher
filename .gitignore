@@ -15,3 +15,7 @@ inputs/
 *_preview.png
 # generated demo artifacts (run make_example.py to recreate locally)
 examples/synthetic*
+# local secrets (API keys) — never commit
+.secrets/
+gemini.txt
+*.key
