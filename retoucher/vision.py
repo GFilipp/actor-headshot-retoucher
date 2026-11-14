@@ -16,6 +16,7 @@ from typing import Protocol
 import numpy as np
 
 from . import faceparse
+from ._retry import call_with_backoff
 from .detect import detect_blemishes
 from .image_io import to_uint8
 
@@ -95,9 +96,8 @@ class GeminiVisionAssessor:
         if not key:
             key = open(os.path.expanduser(self.key_path)).read().strip()
         client = genai.Client(api_key=key)
-        resp = client.models.generate_content(
-            model=self.model, contents=[_VLM_PROMPT, Image.fromarray(to_uint8(image_rgb))]
-        )
+        resp = call_with_backoff(lambda: client.models.generate_content(
+            model=self.model, contents=[_VLM_PROMPT, Image.fromarray(to_uint8(image_rgb))]))
         text = (getattr(resp, "text", "") or "").strip().strip("`")
         if text.startswith("json"):
             text = text[4:]
